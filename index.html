@@ -123,6 +123,60 @@
         .loading { padding: 30px; text-align: center; color: #6b7280; }
         .error { padding: 15px; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 14px; }
 
+        .card-value.clickable, td.clickable {
+            cursor: pointer;
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            text-decoration-color: #93c5fd;
+        }
+
+        .card-value.clickable:hover, td.clickable:hover {
+            opacity: 0.75;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.45);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open { display: flex; }
+
+        .modal-box {
+            background: #ffffff;
+            border-radius: 10px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 70vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 { margin: 0; font-size: 16px; color: #1f2937; }
+
+        .modal-close {
+            background: none; border: none; font-size: 20px;
+            cursor: pointer; color: #6b7280; line-height: 1;
+        }
+
+        .modal-body { padding: 12px 20px; overflow-y: auto; }
+        .modal-body ul { margin: 0; padding-left: 20px; }
+        .modal-body li { padding: 4px 0; font-size: 13px; color: #374151; }
+        .modal-empty { color: #6b7280; font-size: 13px; padding: 10px 0; }
+
         @media (max-width: 900px) {
             .card-row { grid-template-columns: repeat(2, 1fr); }
         }
@@ -151,6 +205,16 @@
         <div class="loading">Loading dashboard...</div>
     </div>
 
+</div>
+
+<div class="modal-overlay" id="drilldownModal">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3 id="drilldownTitle">Records</h3>
+            <button class="modal-close" onclick="closeDrilldown()">&times;</button>
+        </div>
+        <div class="modal-body" id="drilldownBody">Loading...</div>
+    </div>
 </div>
 
 <script>
@@ -264,9 +328,11 @@ function populateOwnerFilter() {
 }
 
 
-function amountCell(bucket) {
+function amountCell(bucket, category) {
     if (!bucket) bucket = { amount_lakh: 0, count: 0 };
-    return '<td class="amount-cell"><span class="big">' + bucket.amount_lakh.toFixed(2) + ' L</span>' +
+    var clickableClass = category ? " clickable" : "";
+    var dataAttr = category ? ' data-cat="' + category + '"' : "";
+    return '<td class="amount-cell' + clickableClass + '"' + dataAttr + '><span class="big">' + bucket.amount_lakh.toFixed(2) + ' L</span>' +
         '<span class="small">' + bucket.count + ' deals</span></td>';
 }
 
@@ -288,17 +354,17 @@ function renderAll() {
     // ---- Summary cards ----
 
     html += '<div class="card-row">';
-    html += cardHtml("Target", owner.target_lakhs.toFixed(2) + " L", "target");
-    html += cardHtml("Achieved (Closed Won)", owner.achieved_count, "achieved");
-    html += cardHtml("Payment Received", owner.payment_received_count, "achieved");
-    html += cardHtml("Payment Pending / Pipeline", owner.payment_pending_count, "pending");
+    html += cardHtml("Target", owner.target_lakhs.toFixed(2) + " L", "target", null);
+    html += cardHtml("Achieved (Closed Won)", owner.achieved_count, "achieved", "achieved");
+    html += cardHtml("Payment Received", owner.payment_received_count, "achieved", "payment_received");
+    html += cardHtml("Payment Pending / Pipeline", owner.payment_pending_count, "pending", "payment_pending");
     html += '</div>';
 
     html += '<div class="card-row">';
-    html += cardHtml("Total Accounts", owner.total_accounts, "");
-    html += cardHtml("Untouched Accounts", owner.untouched, "pending");
-    html += cardHtml("Touched (within 90 days)", owner.touched_90, "achieved");
-    html += cardHtml("Current Pipeline", owner.payment_pending_count, "pending");
+    html += cardHtml("Total Accounts", owner.total_accounts, "", "total_accounts");
+    html += cardHtml("Untouched Accounts", owner.untouched, "pending", "untouched");
+    html += cardHtml("Touched (within 90 days)", owner.touched_90, "achieved", "touched_90");
+    html += cardHtml("Current Pipeline", owner.current_pipeline_count, "pending", "current_pipeline");
     html += '</div>';
 
     // ---- Bucket-wise activity ----
@@ -310,32 +376,49 @@ function renderAll() {
     // ---- Quarter-wise expected business ----
 
     html += '<div class="section"><h2>Quarter-wise Expected Business (FY Apr-Mar)</h2>';
-    html += renderAmountRow(["Q1 (Apr-Jun)", "Q2 (Jul-Sep)", "Q3 (Oct-Dec)", "Q4 (Jan-Mar)"],
-        [owner.quarter_business.Q1, owner.quarter_business.Q2, owner.quarter_business.Q3, owner.quarter_business.Q4]);
+    html += renderAmountRow(
+        ["Q1 (Apr-Jun)", "Q2 (Jul-Sep)", "Q3 (Oct-Dec)", "Q4 (Jan-Mar)"],
+        [owner.quarter_business.Q1, owner.quarter_business.Q2, owner.quarter_business.Q3, owner.quarter_business.Q4],
+        ["quarter:Q1", "quarter:Q2", "quarter:Q3", "quarter:Q4"]
+    );
     html += '</div>';
 
     // ---- Plan-wise expected business ----
 
     html += '<div class="section"><h2>Plan-wise Expected Business</h2>';
     var planNames = Object.keys(owner.plan_business).sort();
-    html += renderAmountRow(planNames, planNames.map(function(p) { return owner.plan_business[p]; }));
+    html += renderAmountRow(
+        planNames,
+        planNames.map(function(p) { return owner.plan_business[p]; }),
+        planNames.map(function(p) { return "plan:" + p; })
+    );
     html += '</div>';
 
     // ---- Stage-wise expected business ----
 
     html += '<div class="section"><h2>Stage-wise Expected Business</h2>';
     var stageNames = Object.keys(owner.stage_business);
-    html += renderAmountRow(stageNames, stageNames.map(function(s) { return owner.stage_business[s]; }));
+    html += renderAmountRow(
+        stageNames,
+        stageNames.map(function(s) { return owner.stage_business[s]; }),
+        stageNames.map(function(s) { return "stage:" + s; })
+    );
     html += '</div>';
 
     document.getElementById("content").innerHTML = html;
 
+    attachDrilldownHandlers(owner.owner_id, selectedOwner);
+
 }
 
 
-function cardHtml(title, value, colorClass) {
+function cardHtml(title, value, colorClass, category) {
+
+    var clickableClass = category ? " clickable" : "";
+    var dataAttr = category ? ' data-cat="' + category + '"' : "";
+
     return '<div class="card"><div class="card-title">' + escapeHtml(title) + '</div>' +
-        '<div class="card-value ' + colorClass + '">' + value + '</div></div>';
+        '<div class="card-value ' + colorClass + clickableClass + '"' + dataAttr + '>' + value + '</div></div>';
 }
 
 
@@ -350,14 +433,24 @@ function renderBucketTable(bucketSummary) {
 
     var grand = { Total: 0, "0-30 Days": 0, "31-60 Days": 0, "61-90 Days": 0, "Not Touched": 0 };
 
+    function bucketCell(count, category) {
+        if (count && count > 0) {
+            return '<td class="clickable" data-cat="' + category + '">' + count + '</td>';
+        }
+        return '<td>' + count + '</td>';
+    }
+
     buckets.forEach(function(bucket) {
 
         var row = bucketSummary[bucket];
 
-        html += '<tr><td class="row-label">' + escapeHtml(bucket) + '</td>' +
-            '<td>' + row.Total + '</td><td>' + row["0-30 Days"] + '</td>' +
-            '<td>' + row["31-60 Days"] + '</td><td>' + row["61-90 Days"] + '</td>' +
-            '<td>' + row["Not Touched"] + '</td></tr>';
+        html += '<tr><td class="row-label">' + escapeHtml(bucket) + '</td>';
+        html += bucketCell(row.Total, "bucket:" + bucket + ":Total");
+        html += bucketCell(row["0-30 Days"], "bucket:" + bucket + ":0-30 Days");
+        html += bucketCell(row["31-60 Days"], "bucket:" + bucket + ":31-60 Days");
+        html += bucketCell(row["61-90 Days"], "bucket:" + bucket + ":61-90 Days");
+        html += bucketCell(row["Not Touched"], "bucket:" + bucket + ":Not Touched");
+        html += '</tr>';
 
         grand.Total += row.Total;
         grand["0-30 Days"] += row["0-30 Days"];
@@ -381,14 +474,14 @@ function renderBucketTable(bucketSummary) {
 }
 
 
-function renderAmountRow(labels, buckets) {
+function renderAmountRow(labels, buckets, categories) {
 
     if (labels.length === 0) return '<div class="loading">No data.</div>';
 
     var html = '<table><thead><tr>';
     labels.forEach(function(label) { html += '<th>' + escapeHtml(label) + '</th>'; });
     html += '</tr></thead><tbody><tr>';
-    buckets.forEach(function(bucket) { html += amountCell(bucket); });
+    buckets.forEach(function(bucket, i) { html += amountCell(bucket, categories ? categories[i] : null); });
     html += '</tr></tbody></table>';
 
     return html;
