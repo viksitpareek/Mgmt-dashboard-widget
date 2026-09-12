@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Management Dashboard</title>
+
+    <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
+
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .container { max-width: 1300px; margin: 0 auto; }
+
+        .header {
+            background: #ffffff;
+            padding: 20px 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .header h1 { margin: 0 0 4px 0; font-size: 22px; color: #1f2937; }
+        .header p { margin: 0; color: #6b7280; font-size: 13px; }
+
+        .header-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        #ownerFilter {
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #d1d5db;
+            font-size: 14px;
+            min-width: 200px;
+        }
+
+        #refreshButton {
+            background: #2563eb;
+            color: #ffffff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        #refreshButton:disabled { background: #9ca3af; }
+
+        .last-updated { font-size: 12px; color: #6b7280; }
+
+        .card-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 18px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+
+        .card-title { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+        .card-value { font-size: 26px; font-weight: bold; color: #111827; }
+        .card-value.target { color: #7c3aed; }
+        .card-value.achieved { color: #059669; }
+        .card-value.pending { color: #d97706; }
+
+        .section {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+
+        .section h2 {
+            margin: 0 0 15px 0;
+            font-size: 17px;
+            color: #1f2937;
+        }
+
+        table { border-collapse: collapse; width: 100%; }
+
+        th, td {
+            border: 1px solid #d0d7de;
+            padding: 8px 10px;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        th { background: #1f4e78; color: #ffffff; }
+
+        td.row-label { text-align: left; font-weight: 600; }
+
+        tr.grand-total { background: #d9eaf7; font-weight: 700; }
+        tbody tr:nth-child(even) { background: #f7f9fb; }
+
+        .amount-cell .big { font-size: 16px; font-weight: 700; display: block; color: #1f2937; }
+        .amount-cell .small { font-size: 11px; color: #6b7280; }
+
+        .loading { padding: 30px; text-align: center; color: #6b7280; }
+        .error { padding: 15px; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 14px; }
+
+        @media (max-width: 900px) {
+            .card-row { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="header">
+        <div>
+            <h1>Management Dashboard</h1>
+            <p>Owner-filterable target, activity, and pipeline overview</p>
+        </div>
+        <div class="header-controls">
+            <select id="ownerFilter" onchange="renderAll()">
+                <option value="All Owners">All Owners</option>
+            </select>
+            <button id="refreshButton" onclick="loadReport()">Refresh</button>
+            <div class="last-updated" id="lastUpdated">Last Updated: -</div>
+        </div>
+    </div>
+
+    <div id="content">
+        <div class="loading">Loading dashboard...</div>
+    </div>
+
+</div>
+
+<script>
+
+var lastReportData = null;
+
+ZOHO.embeddedApp.on("PageLoad", function() { loadReport(); });
+ZOHO.embeddedApp.init();
+
+
+function loadReport() {
+
+    var button = document.getElementById("refreshButton");
+    var content = document.getElementById("content");
+
+    button.disabled = true;
+    button.innerText = "Loading...";
+    content.innerHTML = '<div class="loading">Loading dashboard from Zoho CRM...</div>';
+
+    ZOHO.CRM.FUNCTIONS.execute("mgmt_dashboard_reader", { "arguments": JSON.stringify({}) })
+
+        .then(function(response) {
+
+            var data = findPayload(response);
+
+            if (!data) {
+                content.innerHTML = '<div class="error">Response received, but no usable data was found.</div>';
+                return;
+            }
+
+            if (data.status === "error") {
+                content.innerHTML = '<div class="error">' + escapeHtml(data.message || "Unknown error.") + '</div>';
+                return;
+            }
+
+            lastReportData = data;
+            populateOwnerFilter();
+            renderAll();
+
+            document.getElementById("lastUpdated").innerText = "Last Updated: " + (data.generated_time || "-");
+
+        })
+
+        .catch(function(error) {
+            content.innerHTML = '<div class="error">Unable to load dashboard.<br><pre>' +
+                escapeHtml(JSON.stringify(error, null, 2)) + '</pre></div>';
+        })
+
+        .finally(function() {
+            button.disabled = false;
+            button.innerText = "Refresh";
+        });
+
+}
+
+
+function findPayload(response, depth) {
+
+    depth = depth || 0;
+    if (depth > 8 || response === null || response === undefined) return null;
+
+    if (typeof response === "string") {
+        try { return findPayload(JSON.parse(response), depth + 1); }
+        catch (e) { return null; }
+    }
+
+    if (typeof response === "object") {
+
+        if (response.per_owner || response.status === "error") {
+            return response;
+        }
+
+        var priorityKeys = ["output", "details", "result", "response", "data"];
+
+        for (var i = 0; i < priorityKeys.length; i++) {
+            if (response[priorityKeys[i]] !== undefined) {
+                var found = findPayload(response[priorityKeys[i]], depth + 1);
+                if (found) return found;
+            }
+        }
+
+        for (var key in response) {
+            if (priorityKeys.indexOf(key) !== -1) continue;
+            var found2 = findPayload(response[key], depth + 1);
+            if (found2) return found2;
+        }
+    }
+
+    return null;
+}
+
+
+function populateOwnerFilter() {
+
+    var select = document.getElementById("ownerFilter");
+    var currentValue = select.value || "All Owners";
+
+    select.innerHTML = '<option value="All Owners">All Owners</option>';
+
+    (lastReportData.owner_names || []).forEach(function(name) {
+        if (name === "All Owners") return;
+        var option = document.createElement("option");
+        option.value = name;
+        option.innerText = name;
+        select.appendChild(option);
+    });
+
+    select.value = currentValue;
+    if (select.value !== currentValue) select.value = "All Owners";
+
+}
+
+
+function amountCell(bucket) {
+    if (!bucket) bucket = { amount_lakh: 0, count: 0 };
+    return '<td class="amount-cell"><span class="big">' + bucket.amount_lakh.toFixed(2) + ' L</span>' +
+        '<span class="small">' + bucket.count + ' deals</span></td>';
+}
+
+
+function renderAll() {
+
+    if (!lastReportData) return;
+
+    var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
+    var owner = lastReportData.per_owner[selectedOwner];
+
+    if (!owner) {
+        document.getElementById("content").innerHTML = '<div class="error">No data for this owner.</div>';
+        return;
+    }
+
+    var html = "";
+
+    // ---- Summary cards ----
+
+    html += '<div class="card-row">';
+    html += cardHtml("Target", owner.target_lakhs.toFixed(2) + " L", "target");
+    html += cardHtml("Achieved (Closed Won)", owner.achieved_count, "achieved");
+    html += cardHtml("Payment Received", owner.payment_received_count, "achieved");
+    html += cardHtml("Payment Pending / Pipeline", owner.payment_pending_count, "pending");
+    html += '</div>';
+
+    html += '<div class="card-row">';
+    html += cardHtml("Total Accounts", owner.total_accounts, "");
+    html += cardHtml("Untouched Accounts", owner.untouched, "pending");
+    html += cardHtml("Touched (within 90 days)", owner.touched_90, "achieved");
+    html += cardHtml("Current Pipeline", owner.payment_pending_count, "pending");
+    html += '</div>';
+
+    // ---- Bucket-wise activity ----
+
+    html += '<div class="section"><h2>Bucket-wise Activity</h2>';
+    html += renderBucketTable(owner.bucket_summary);
+    html += '</div>';
+
+    // ---- Quarter-wise expected business ----
+
+    html += '<div class="section"><h2>Quarter-wise Expected Business (FY Apr-Mar)</h2>';
+    html += renderAmountRow(["Q1 (Apr-Jun)", "Q2 (Jul-Sep)", "Q3 (Oct-Dec)", "Q4 (Jan-Mar)"],
+        [owner.quarter_business.Q1, owner.quarter_business.Q2, owner.quarter_business.Q3, owner.quarter_business.Q4]);
+    html += '</div>';
+
+    // ---- Plan-wise expected business ----
+
+    html += '<div class="section"><h2>Plan-wise Expected Business</h2>';
+    var planNames = Object.keys(owner.plan_business).sort();
+    html += renderAmountRow(planNames, planNames.map(function(p) { return owner.plan_business[p]; }));
+    html += '</div>';
+
+    // ---- Stage-wise expected business ----
+
+    html += '<div class="section"><h2>Stage-wise Expected Business</h2>';
+    var stageNames = Object.keys(owner.stage_business);
+    html += renderAmountRow(stageNames, stageNames.map(function(s) { return owner.stage_business[s]; }));
+    html += '</div>';
+
+    document.getElementById("content").innerHTML = html;
+
+}
+
+
+function cardHtml(title, value, colorClass) {
+    return '<div class="card"><div class="card-title">' + escapeHtml(title) + '</div>' +
+        '<div class="card-value ' + colorClass + '">' + value + '</div></div>';
+}
+
+
+function renderBucketTable(bucketSummary) {
+
+    var buckets = Object.keys(bucketSummary || {}).sort(function(a, b) {
+        return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    var html = '<table><thead><tr><th style="text-align:left;">Bucket</th>' +
+        '<th>Total</th><th>0-30 Days</th><th>31-60 Days</th><th>61-90 Days</th><th>Not Touched</th></tr></thead><tbody>';
+
+    var grand = { Total: 0, "0-30 Days": 0, "31-60 Days": 0, "61-90 Days": 0, "Not Touched": 0 };
+
+    buckets.forEach(function(bucket) {
+
+        var row = bucketSummary[bucket];
+
+        html += '<tr><td class="row-label">' + escapeHtml(bucket) + '</td>' +
+            '<td>' + row.Total + '</td><td>' + row["0-30 Days"] + '</td>' +
+            '<td>' + row["31-60 Days"] + '</td><td>' + row["61-90 Days"] + '</td>' +
+            '<td>' + row["Not Touched"] + '</td></tr>';
+
+        grand.Total += row.Total;
+        grand["0-30 Days"] += row["0-30 Days"];
+        grand["31-60 Days"] += row["31-60 Days"];
+        grand["61-90 Days"] += row["61-90 Days"];
+        grand["Not Touched"] += row["Not Touched"];
+
+    });
+
+    html += '<tr class="grand-total"><td class="row-label">Grand Total</td>' +
+        '<td>' + grand.Total + '</td><td>' + grand["0-30 Days"] + '</td>' +
+        '<td>' + grand["31-60 Days"] + '</td><td>' + grand["61-90 Days"] + '</td>' +
+        '<td>' + grand["Not Touched"] + '</td></tr>';
+
+    html += '</tbody></table>';
+
+    if (buckets.length === 0) return '<div class="loading">No bucket data.</div>';
+
+    return html;
+
+}
+
+
+function renderAmountRow(labels, buckets) {
+
+    if (labels.length === 0) return '<div class="loading">No data.</div>';
+
+    var html = '<table><thead><tr>';
+    labels.forEach(function(label) { html += '<th>' + escapeHtml(label) + '</th>'; });
+    html += '</tr></thead><tbody><tr>';
+    buckets.forEach(function(bucket) { html += amountCell(bucket); });
+    html += '</tr></tbody></table>';
+
+    return html;
+
+}
+
+
+function escapeHtml(value) {
+    if (value === undefined || value === null) return "";
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+</script>
+
+</body>
+</html>
