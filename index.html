@@ -6,6 +6,7 @@
     <title>Management Dashboard</title>
 
     <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 
     <style>
         * { box-sizing: border-box; }
@@ -176,6 +177,27 @@
         .modal-body ul { margin: 0; padding-left: 20px; }
         .modal-body li { padding: 4px 0; font-size: 13px; color: #374151; }
         .modal-empty { color: #6b7280; font-size: 13px; padding: 10px 0; }
+
+        .chart-wrapper { max-width: 700px; margin: 0 auto; height: 280px; }
+
+        .funnel { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; }
+
+        .funnel-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 10px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: center;
+            min-width: 120px;
+        }
+
+        .funnel-row .funnel-label { display: block; font-size: 12px; opacity: 0.9; }
+        .funnel-row .funnel-value { display: block; font-size: 15px; }
 
         @media (max-width: 900px) {
             .card-row { grid-template-columns: repeat(2, 1fr); }
@@ -373,39 +395,28 @@ function renderAll() {
     html += renderBucketTable(owner.bucket_summary);
     html += '</div>';
 
-    // ---- Quarter-wise expected business ----
+    // ---- Quarter-wise expected business (bar chart) ----
 
     html += '<div class="section"><h2>Quarter-wise Expected Business (FY Apr-Mar)</h2>';
-    html += renderAmountRow(
-        ["Q1 (Apr-Jun)", "Q2 (Jul-Sep)", "Q3 (Oct-Dec)", "Q4 (Jan-Mar)"],
-        [owner.quarter_business.Q1, owner.quarter_business.Q2, owner.quarter_business.Q3, owner.quarter_business.Q4],
-        ["quarter:Q1", "quarter:Q2", "quarter:Q3", "quarter:Q4"]
-    );
+    html += '<div class="chart-wrapper"><canvas id="quarterChart"></canvas></div>';
     html += '</div>';
 
-    // ---- Plan-wise expected business ----
+    // ---- Plan-wise expected business (bar chart) ----
 
-    html += '<div class="section"><h2>Plan-wise Expected Business</h2>';
-    var planNames = Object.keys(owner.plan_business).sort();
-    html += renderAmountRow(
-        planNames,
-        planNames.map(function(p) { return owner.plan_business[p]; }),
-        planNames.map(function(p) { return "plan:" + p; })
-    );
+    html += '<div class="section"><h2>Plan-wise Expected Business (Deal Category)</h2>';
+    html += '<div class="chart-wrapper"><canvas id="planChart"></canvas></div>';
     html += '</div>';
 
-    // ---- Stage-wise expected business ----
+    // ---- Stage-wise expected business (funnel) ----
 
     html += '<div class="section"><h2>Stage-wise Expected Business</h2>';
-    var stageNames = Object.keys(owner.stage_business);
-    html += renderAmountRow(
-        stageNames,
-        stageNames.map(function(s) { return owner.stage_business[s]; }),
-        stageNames.map(function(s) { return "stage:" + s; })
-    );
+    html += renderFunnel(owner.stage_business);
     html += '</div>';
 
     document.getElementById("content").innerHTML = html;
+
+    renderQuarterChart(owner.quarter_business);
+    renderPlanChart(owner.plan_business);
 
     attachDrilldownHandlers(owner.owner_id, selectedOwner);
 
@@ -429,9 +440,9 @@ function renderBucketTable(bucketSummary) {
     });
 
     var html = '<table><thead><tr><th style="text-align:left;">Bucket</th>' +
-        '<th>Total</th><th>0-30 Days</th><th>31-60 Days</th><th>61-90 Days</th><th>Not Touched</th></tr></thead><tbody>';
+        '<th>Total</th><th>Last 30 Days</th><th>31-60 Days</th><th>60+ Days</th><th>Non-Touched</th></tr></thead><tbody>';
 
-    var grand = { Total: 0, "0-30 Days": 0, "31-60 Days": 0, "61-90 Days": 0, "Not Touched": 0 };
+    var grand = { Total: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, non_touched: 0 };
 
     function bucketCell(count, category) {
         if (count && count > 0) {
@@ -446,24 +457,24 @@ function renderBucketTable(bucketSummary) {
 
         html += '<tr><td class="row-label">' + escapeHtml(bucket) + '</td>';
         html += bucketCell(row.Total, "bucket:" + bucket + ":Total");
-        html += bucketCell(row["0-30 Days"], "bucket:" + bucket + ":0-30 Days");
-        html += bucketCell(row["31-60 Days"], "bucket:" + bucket + ":31-60 Days");
-        html += bucketCell(row["61-90 Days"], "bucket:" + bucket + ":61-90 Days");
-        html += bucketCell(row["Not Touched"], "bucket:" + bucket + ":Not Touched");
+        html += bucketCell(row.last_30, "bucket:" + bucket + ":last_30");
+        html += bucketCell(row.days_31_60, "bucket:" + bucket + ":days_31_60");
+        html += bucketCell(row.days_60_plus, "bucket:" + bucket + ":days_60_plus");
+        html += bucketCell(row.non_touched, "bucket:" + bucket + ":non_touched");
         html += '</tr>';
 
         grand.Total += row.Total;
-        grand["0-30 Days"] += row["0-30 Days"];
-        grand["31-60 Days"] += row["31-60 Days"];
-        grand["61-90 Days"] += row["61-90 Days"];
-        grand["Not Touched"] += row["Not Touched"];
+        grand.last_30 += row.last_30;
+        grand.days_31_60 += row.days_31_60;
+        grand.days_60_plus += row.days_60_plus;
+        grand.non_touched += row.non_touched;
 
     });
 
     html += '<tr class="grand-total"><td class="row-label">Grand Total</td>' +
-        '<td>' + grand.Total + '</td><td>' + grand["0-30 Days"] + '</td>' +
-        '<td>' + grand["31-60 Days"] + '</td><td>' + grand["61-90 Days"] + '</td>' +
-        '<td>' + grand["Not Touched"] + '</td></tr>';
+        '<td>' + grand.Total + '</td><td>' + grand.last_30 + '</td>' +
+        '<td>' + grand.days_31_60 + '</td><td>' + grand.days_60_plus + '</td>' +
+        '<td>' + grand.non_touched + '</td></tr>';
 
     html += '</tbody></table>';
 
@@ -474,19 +485,132 @@ function renderBucketTable(bucketSummary) {
 }
 
 
-function renderAmountRow(labels, buckets, categories) {
+var quarterChartInstance = null;
+var planChartInstance = null;
 
-    if (labels.length === 0) return '<div class="loading">No data.</div>';
 
-    var html = '<table><thead><tr>';
-    labels.forEach(function(label) { html += '<th>' + escapeHtml(label) + '</th>'; });
-    html += '</tr></thead><tbody><tr>';
-    buckets.forEach(function(bucket, i) { html += amountCell(bucket, categories ? categories[i] : null); });
-    html += '</tr></tbody></table>';
+function renderQuarterChart(quarterBusiness) {
+
+    var ctx = document.getElementById("quarterChart");
+    if (!ctx) return;
+
+    var labels = ["Q1 (Apr-Jun)", "Q2 (Jul-Sep)", "Q3 (Oct-Dec)", "Q4 (Jan-Mar)"];
+    var keys = ["Q1", "Q2", "Q3", "Q4"];
+    var amounts = keys.map(function(k) { return quarterBusiness[k].amount_lakh; });
+    var counts = keys.map(function(k) { return quarterBusiness[k].count; });
+
+    if (quarterChartInstance) quarterChartInstance.destroy();
+
+    quarterChartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Amount (Lakhs)",
+                data: amounts,
+                backgroundColor: "#2563eb"
+            }]
+        },
+        options: {
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(item) {
+                            return item.parsed.y.toFixed(2) + " L (" + counts[item.dataIndex] + " deals)";
+                        }
+                    }
+                },
+                legend: { display: false }
+            },
+            scales: { y: { beginAtZero: true, title: { display: true, text: "Amount (Lakhs)" } } },
+            onClick: function(evt, elements) {
+                if (elements.length === 0) return;
+                var i = elements[0].index;
+                openDrilldown("quarter:" + keys[i], labels[i]);
+            }
+        }
+    });
+
+}
+
+
+function renderPlanChart(planBusiness) {
+
+    var ctx = document.getElementById("planChart");
+    if (!ctx) return;
+
+    var planNames = Object.keys(planBusiness).sort();
+    var amounts = planNames.map(function(p) { return planBusiness[p].amount_lakh; });
+    var counts = planNames.map(function(p) { return planBusiness[p].count; });
+
+    if (planChartInstance) planChartInstance.destroy();
+
+    if (planNames.length === 0) {
+        ctx.parentElement.innerHTML = '<div class="loading">No plan data.</div>';
+        return;
+    }
+
+    planChartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: planNames,
+            datasets: [{
+                label: "Amount (Lakhs)",
+                data: amounts,
+                backgroundColor: "#059669"
+            }]
+        },
+        options: {
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(item) {
+                            return item.parsed.y.toFixed(2) + " L (" + counts[item.dataIndex] + " deals)";
+                        }
+                    }
+                },
+                legend: { display: false }
+            },
+            scales: { y: { beginAtZero: true, title: { display: true, text: "Amount (Lakhs)" } } },
+            onClick: function(evt, elements) {
+                if (elements.length === 0) return;
+                var i = elements[0].index;
+                openDrilldown("plan:" + planNames[i], planNames[i]);
+            }
+        }
+    });
+
+}
+
+
+function renderFunnel(stageBusiness) {
+
+    var stageOrder = Object.keys(stageBusiness);
+    var maxCount = Math.max.apply(null, stageOrder.map(function(s) { return stageBusiness[s].count; }).concat([1]));
+
+    var colors = ["#1f4e78", "#2563eb", "#3b82f6", "#60a5fa", "#059669", "#dc2626"];
+
+    var html = '<div class="funnel">';
+
+    stageOrder.forEach(function(stage, i) {
+
+        var data = stageBusiness[stage];
+        var widthPct = Math.max(20, Math.round((data.count / maxCount) * 100));
+        var color = colors[i % colors.length];
+
+        html += '<div class="funnel-row clickable" style="width:' + widthPct + '%;background:' + color + ';" data-cat="stage:' + stage + '">' +
+            '<div><span class="funnel-label">' + escapeHtml(stage) + '</span>' +
+            '<span class="funnel-value">' + data.amount_lakh.toFixed(2) + ' L (' + data.count + ')</span></div>' +
+            '</div>';
+
+    });
+
+    html += '</div>';
 
     return html;
 
 }
+
 
 
 function escapeHtml(value) {
