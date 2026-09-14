@@ -385,7 +385,7 @@ function renderAll() {
     html += '<div class="card-row">';
     html += cardHtml("Total Accounts", owner.total_accounts, "", "total_accounts");
     html += cardHtml("Untouched Accounts", owner.untouched, "pending", "untouched");
-    html += cardHtml("Touched (within 90 days)", owner.touched_90, "achieved", "touched_90");
+    html += cardHtml("Touched", owner.touched, "achieved", "touched");
     html += cardHtml("Current Pipeline", owner.current_pipeline_count, "pending", "current_pipeline");
     html += '</div>';
 
@@ -611,6 +611,339 @@ function renderFunnel(stageBusiness) {
 
 }
 
+
+
+/* =========================================================
+   DRILLDOWN (client-side, live ZOHO.CRM.API calls - same
+   proven approach as the Account Owner Report widget, since
+   server-function argument passing was unreliable in this
+   environment)
+   ========================================================= */
+
+function zohoSearchAll(module, criteria) {
+
+    return new Promise(function(resolve) {
+
+        var allRecords = [];
+        var page = 1;
+
+        function fetchPage() {
+
+            var searchPromise = criteria
+                ? ZOHO.CRM.API.searchRecord({ Entity: module, Type: "criteria", Query: criteria, page: page, per_page: 200 })
+                : ZOHO.CRM.API.getAllRecords({ Entity: module, sort_order: "asc", page: page, per_page: 200 });
+
+            searchPromise
+                .then(function(response) {
+
+                    if (response && response.data) {
+                        allRecords = allRecords.concat(response.data);
+                    }
+
+                    if (response && response.info && response.info.more_records === true && page < 150) {
+                        page++;
+                        fetchPage();
+                    } else {
+                        resolve(allRecords);
+                    }
+                })
+                .catch(function() {
+                    resolve(allRecords);
+                });
+        }
+
+        fetchPage();
+    });
+}
+
+
+function ddLookupId(value) {
+    if (value && typeof value === "object") return String(value.id || "");
+    return String(value || "");
+}
+
+
+function ddLookupName(value, fallback) {
+    if (value && typeof value === "object") return value.name || (fallback || "Unassigned");
+    return fallback || "Unassigned";
+}
+
+
+function ddParseDate(value) {
+    if (!value) return null;
+    var d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+}
+
+
+function ddFiscalQuarter(date) {
+    if (!date) return null;
+    var month = date.getMonth() + 1;
+    if (month >= 4 && month <= 6) return "Q1";
+    if (month >= 7 && month <= 9) return "Q2";
+    if (month >= 10 && month <= 12) return "Q3";
+    return "Q4";
+}
+
+
+function attachDrilldownHandlers(ownerId, ownerName) {
+
+    document.querySelectorAll(".clickable").forEach(function(el) {
+
+        el.onclick = function() {
+
+            var category = el.getAttribute("data-cat");
+            if (!category) return;
+
+            openDrilldown(ownerId || null, ownerName, category);
+        };
+
+    });
+
+}
+
+
+function categoryLabel(category) {
+
+    var labels = {
+        "achieved": "Achieved (Closed Won)",
+        "payment_received": "Payment Received",
+        "payment_pending": "Payment Pending",
+        "current_pipeline": "Current Pipeline",
+        "total_accounts": "Total Accounts",
+        "untouched": "Untouched Accounts",
+        "touched": "Touched Accounts"
+    };
+
+    if (labels[category]) return labels[category];
+
+    if (category.indexOf("bucket:") === 0) {
+        var parts = category.split(":");
+        return parts[1] + " - " + parts[2].replace(/_/g, " ");
+    }
+
+    if (category.indexOf("quarter:") === 0) return category.substring(8) + " Expected Business";
+    if (category.indexOf("plan:") === 0) return category.substring(5) + " Expected Business";
+    if (category.indexOf("stage:") === 0) return category.substring(6) + " Deals";
+
+    return category;
+}
+
+
+function openDrilldown(ownerId, ownerName, category) {
+
+    var modal = document.getElementById("drilldownModal");
+    var title = document.getElementById("drilldownTitle");
+    var body = document.getElementById("drilldownBody");
+
+    title.innerText = (ownerName || "All Owners") + " - " + categoryLabel(category);
+    body.innerHTML = "Loading...";
+    modal.classList.add("open");
+
+    runDrilldown(ownerId, ownerName, category)
+
+        .then(function(names) {
+
+            if (!names || names.length === 0) {
+                body.innerHTML = '<div class="modal-empty">No matching records found.</div>';
+                return;
+            }
+
+            var html = "<ul>";
+            names.forEach(function(name) { html += "<li>" + escapeHtml(name) + "</li>"; });
+            html += "</ul>";
+            body.innerHTML = html;
+
+        })
+
+        .catch(function(err) {
+            body.innerHTML = '<div class="modal-empty">Failed to load records.</div>';
+            console.error("Drilldown error:", err);
+        });
+
+}
+
+
+function closeDrilldown() {
+    document.getElementById("drilldownModal").classList.remove("open");
+}
+
+
+async function runDrilldown(ownerId, ownerName, category) {
+
+    var isAllOwners = !ownerId;
+
+    if (category === "total_accounts" || category === "untouched" || category === "touched" || category.indexOf("bucket:") === 0) {
+
+        var accounts = await zohoSearchAll("Accounts", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
+
+        var accountById = {};
+        accounts.forEach(function(a) {
+            if (a.id) {
+                accountById[String(a.id)] = {
+                    name: a.Account_Name || "",
+                    ownerId: ddLookupId(a.Owner),
+                    bucket: a.Bucket_Type || "No Bucket"
+                };
+            }
+        });
+
+        if (category === "total_accounts") {
+            return Object.values(accountById).map(function(a) { return a.name; }).sort();
+        }
+
+        var calls = await zohoSearchAll("Calls", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
+
+        var latestCallByAccount = {};
+
+        calls.forEach(function(call) {
+
+            var whatId = ddLookupId(call.What_Id);
+            var account = accountById[whatId];
+            if (!account) return;
+
+            var callOwnerId = ddLookupId(call.Owner);
+            if (!callOwnerId || callOwnerId !== account.ownerId) return;
+
+            var callDate = ddParseDate(call.Call_Start_Time);
+            if (!callDate) return;
+
+            if (!latestCallByAccount[whatId] || callDate > latestCallByAccount[whatId]) {
+                latestCallByAccount[whatId] = callDate;
+            }
+        });
+
+        var now = new Date();
+        var matches = [];
+
+        Object.keys(accountById).forEach(function(accId) {
+
+            var account = accountById[accId];
+            var lastCall = latestCallByAccount[accId];
+
+            var agingBucket = null;
+
+            if (lastCall) {
+                var daysOld = (now - lastCall) / 86400000;
+                if (daysOld <= 30) agingBucket = "last_30";
+                else if (daysOld <= 60) agingBucket = "days_31_60";
+                else agingBucket = "days_60_plus";
+            }
+
+            var isMatch = false;
+
+            if (category === "untouched") {
+                isMatch = !lastCall;
+            } else if (category === "touched") {
+                isMatch = !!lastCall;
+            } else if (category.indexOf("bucket:") === 0) {
+
+                var parts = category.split(":");
+                var bucketName = parts[1];
+                var bucketCategory = parts[2];
+
+                if (account.bucket !== bucketName) {
+                    isMatch = false;
+                } else if (bucketCategory === "Total") {
+                    isMatch = true;
+                } else if (bucketCategory === "non_touched") {
+                    isMatch = !lastCall;
+                } else {
+                    isMatch = (agingBucket === bucketCategory);
+                }
+            }
+
+            if (isMatch) matches.push(account.name);
+        });
+
+        return matches.sort();
+    }
+
+    if (category === "achieved" || category === "payment_received" || category === "payment_pending" || category === "current_pipeline") {
+
+        var deals2 = await zohoSearchAll("Deals", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
+
+        var accountOwnerById = {};
+
+        if (category === "current_pipeline") {
+            var accountsForPipeline = await zohoSearchAll("Accounts", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
+            accountsForPipeline.forEach(function(a) {
+                if (a.id) accountOwnerById[String(a.id)] = ddLookupName(a.Owner);
+            });
+        }
+
+        var results = [];
+
+        deals2.forEach(function(deal) {
+
+            var dealOwnerName = ddLookupName(deal.Owner);
+            var dealName = String(deal.Deal_Name || "");
+            var stage = deal.Stage || "";
+            var dealYear = String(deal.Year2 || "").trim();
+            var yearMatches = (dealYear === "2026-2027");
+
+            if (!yearMatches) return;
+
+            if (category === "achieved" && stage === "Closed Won") {
+                results.push(dealName);
+            } else if (category === "payment_received") {
+                var excluded = dealName.toLowerCase().indexOf("test") !== -1 || dealName.toLowerCase().indexOf("trigya") !== -1;
+                if (["Payment Received", "Short Payment", "Part Payment Received"].indexOf(stage) !== -1 && !excluded) {
+                    results.push(dealName);
+                }
+            } else if (category === "payment_pending") {
+                if (["Order Booked", "Email Confirmation", "PI Sent - Order Received"].indexOf(stage) !== -1) {
+                    results.push(dealName);
+                }
+            } else if (category === "current_pipeline") {
+                var accId = ddLookupId(deal.Account_Name);
+                var accOwnerName = accountOwnerById[accId];
+                if (accOwnerName && accOwnerName === dealOwnerName && stage !== "Closed Won" && stage !== "Closed Lost") {
+                    results.push(dealName);
+                }
+            }
+        });
+
+        return results.sort();
+    }
+
+    var accountsForDeals = await zohoSearchAll("Accounts", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
+    var accountIdSet = {};
+    accountsForDeals.forEach(function(a) { if (a.id) accountIdSet[String(a.id)] = true; });
+
+    var allDeals = await zohoSearchAll("Deals", null);
+    var matchedDeals = [];
+
+    allDeals.forEach(function(deal) {
+
+        var accId = ddLookupId(deal.Account_Name);
+        if (!isAllOwners && !accountIdSet[accId]) return;
+
+        var stage = deal.Stage || "";
+        var dealName = String(deal.Deal_Name || "");
+
+        if (category.indexOf("quarter:") === 0) {
+
+            var targetQuarter = category.substring(8);
+            var closingDate = ddParseDate(deal.Closing_Date);
+            if (ddFiscalQuarter(closingDate) === targetQuarter) matchedDeals.push(dealName);
+
+        } else if (category.indexOf("plan:") === 0) {
+
+            var targetPlan = category.substring(5);
+            var dealPlan = deal.Deal_Category || "No Plan";
+            if (dealPlan === targetPlan) matchedDeals.push(dealName);
+
+        } else if (category.indexOf("stage:") === 0) {
+
+            var targetStage = category.substring(6);
+            if (stage === targetStage) matchedDeals.push(dealName);
+        }
+    });
+
+    return matchedDeals.sort();
+
+}
 
 
 function escapeHtml(value) {
