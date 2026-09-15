@@ -263,7 +263,7 @@ function loadReport() {
     button.innerText = "Loading...";
     content.innerHTML = '<div class="loading">Loading dashboard from Zoho CRM...</div>';
 
-    ZOHO.CRM.FUNCTIONS.execute("mgmt_dashboard_reader", { "arguments": JSON.stringify({}) })
+    ZOHO.CRM.FUNCTIONS.execute("Mgmt_dashboard_reader", { "arguments": JSON.stringify({}) })
 
         .then(function(response) {
 
