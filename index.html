@@ -178,7 +178,7 @@
         .modal-body li { padding: 4px 0; font-size: 13px; color: #374151; }
         .modal-empty { color: #6b7280; font-size: 13px; padding: 10px 0; }
 
-        .chart-wrapper { max-width: 700px; margin: 0 auto; height: 280px; }
+        .chart-wrapper { max-width: 700px; margin: 0 auto; height: 280px; position: relative; }
 
         .funnel { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; }
 
@@ -227,6 +227,13 @@
         <div class="loading">Loading dashboard...</div>
     </div>
 
+    <div class="section">
+        <h2>Account Owner Summary (FY 2026-27)</h2>
+        <div id="accountOwnerSummarySection">
+            <div class="loading">Loading account owner summary...</div>
+        </div>
+    </div>
+
 </div>
 
 <div class="modal-overlay" id="drilldownModal">
@@ -243,7 +250,7 @@
 
 var lastReportData = null;
 
-ZOHO.embeddedApp.on("PageLoad", function() { loadReport(); });
+ZOHO.embeddedApp.on("PageLoad", function() { loadReport(); loadAccountOwnerSummary(); });
 ZOHO.embeddedApp.init();
 
 
@@ -415,8 +422,8 @@ function renderAll() {
 
     document.getElementById("content").innerHTML = html;
 
-    renderQuarterChart(owner.quarter_business);
-    renderPlanChart(owner.plan_business);
+    renderQuarterChart(owner.quarter_business, owner.owner_id, selectedOwner);
+    renderPlanChart(owner.plan_business, owner.owner_id, selectedOwner);
 
     attachDrilldownHandlers(owner.owner_id, selectedOwner);
 
@@ -489,7 +496,7 @@ var quarterChartInstance = null;
 var planChartInstance = null;
 
 
-function renderQuarterChart(quarterBusiness) {
+function renderQuarterChart(quarterBusiness, ownerId, ownerName) {
 
     var ctx = document.getElementById("quarterChart");
     if (!ctx) return;
@@ -512,11 +519,13 @@ function renderQuarterChart(quarterBusiness) {
             }]
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 tooltip: {
                     callbacks: {
                         label: function(item) {
-                            return item.parsed.y.toFixed(2) + " L (" + counts[item.dataIndex] + " deals)";
+                            return item.parsed.y.toFixed(2) + " L (" + counts[item.dataIndex] + " accounts)";
                         }
                     }
                 },
@@ -526,7 +535,7 @@ function renderQuarterChart(quarterBusiness) {
             onClick: function(evt, elements) {
                 if (elements.length === 0) return;
                 var i = elements[0].index;
-                openDrilldown("quarter:" + keys[i], labels[i]);
+                openDrilldown(ownerId || null, ownerName, "quarter:" + keys[i]);
             }
         }
     });
@@ -534,7 +543,7 @@ function renderQuarterChart(quarterBusiness) {
 }
 
 
-function renderPlanChart(planBusiness) {
+function renderPlanChart(planBusiness, ownerId, ownerName) {
 
     var ctx = document.getElementById("planChart");
     if (!ctx) return;
@@ -561,11 +570,13 @@ function renderPlanChart(planBusiness) {
             }]
         },
         options: {
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
                 tooltip: {
                     callbacks: {
                         label: function(item) {
-                            return item.parsed.y.toFixed(2) + " L (" + counts[item.dataIndex] + " deals)";
+                            return item.parsed.y.toFixed(2) + " L (" + counts[item.dataIndex] + " accounts)";
                         }
                     }
                 },
@@ -575,7 +586,7 @@ function renderPlanChart(planBusiness) {
             onClick: function(evt, elements) {
                 if (elements.length === 0) return;
                 var i = elements[0].index;
-                openDrilldown("plan:" + planNames[i], planNames[i]);
+                openDrilldown(ownerId || null, ownerName, "plan:" + planNames[i]);
             }
         }
     });
@@ -872,7 +883,7 @@ async function runDrilldown(ownerId, ownerName, category) {
             });
         }
 
-        var results = [];
+        var uniqueAccounts = {}; // accountId -> accountName, dedup via object keys
 
         deals2.forEach(function(deal) {
 
@@ -882,29 +893,31 @@ async function runDrilldown(ownerId, ownerName, category) {
             var dealYear = String(deal.Year2 || "").trim();
             var yearMatches = (dealYear === "2026-2027");
 
-            if (!yearMatches) return;
+            var accId = ddLookupId(deal.Account_Name);
+            var accName = ddLookupName(deal.Account_Name, "(Unnamed Account)");
+
+            if (!yearMatches || !accId) return;
 
             if (category === "achieved" && stage === "Closed Won") {
-                results.push(dealName);
+                uniqueAccounts[accId] = accName;
             } else if (category === "payment_received") {
                 var excluded = dealName.toLowerCase().indexOf("test") !== -1 || dealName.toLowerCase().indexOf("trigya") !== -1;
                 if (["Payment Received", "Short Payment", "Part Payment Received"].indexOf(stage) !== -1 && !excluded) {
-                    results.push(dealName);
+                    uniqueAccounts[accId] = accName;
                 }
             } else if (category === "payment_pending") {
                 if (["Order Booked", "Email Confirmation", "PI Sent - Order Received"].indexOf(stage) !== -1) {
-                    results.push(dealName);
+                    uniqueAccounts[accId] = accName;
                 }
             } else if (category === "current_pipeline") {
-                var accId = ddLookupId(deal.Account_Name);
                 var accOwnerName = accountOwnerById[accId];
                 if (accOwnerName && accOwnerName === dealOwnerName && stage !== "Closed Won" && stage !== "Closed Lost") {
-                    results.push(dealName);
+                    uniqueAccounts[accId] = accName;
                 }
             }
         });
 
-        return results.sort();
+        return Object.values(uniqueAccounts).sort();
     }
 
     var accountsForDeals = await zohoSearchAll("Accounts", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
@@ -912,36 +925,123 @@ async function runDrilldown(ownerId, ownerName, category) {
     accountsForDeals.forEach(function(a) { if (a.id) accountIdSet[String(a.id)] = true; });
 
     var allDeals = await zohoSearchAll("Deals", null);
-    var matchedDeals = [];
+    var uniqueAccounts2 = {};
 
     allDeals.forEach(function(deal) {
 
         var accId = ddLookupId(deal.Account_Name);
+        var accName = ddLookupName(deal.Account_Name, "(Unnamed Account)");
+
+        if (!accId) return;
         if (!isAllOwners && !accountIdSet[accId]) return;
 
+        var dealYear = String(deal.Year2 || "").trim();
+        if (dealYear !== "2026-2027") return;
+
         var stage = deal.Stage || "";
-        var dealName = String(deal.Deal_Name || "");
 
         if (category.indexOf("quarter:") === 0) {
 
             var targetQuarter = category.substring(8);
             var closingDate = ddParseDate(deal.Closing_Date);
-            if (ddFiscalQuarter(closingDate) === targetQuarter) matchedDeals.push(dealName);
+            if (ddFiscalQuarter(closingDate) === targetQuarter) uniqueAccounts2[accId] = accName;
 
         } else if (category.indexOf("plan:") === 0) {
 
             var targetPlan = category.substring(5);
             var dealPlan = deal.Deal_Category || "No Plan";
-            if (dealPlan === targetPlan) matchedDeals.push(dealName);
+            if (dealPlan === targetPlan) uniqueAccounts2[accId] = accName;
 
         } else if (category.indexOf("stage:") === 0) {
 
             var targetStage = category.substring(6);
-            if (stage === targetStage) matchedDeals.push(dealName);
+            if (stage === targetStage) uniqueAccounts2[accId] = accName;
         }
     });
 
-    return matchedDeals.sort();
+    return Object.values(uniqueAccounts2).sort();
+
+}
+
+
+
+/* =========================================================
+   ACCOUNT OWNER SUMMARY (embedded from the other report's cache,
+   FY 2026-27 view - shown at the bottom of this dashboard)
+   ========================================================= */
+
+function loadAccountOwnerSummary() {
+
+    var container = document.getElementById("accountOwnerSummarySection");
+
+    ZOHO.CRM.FUNCTIONS.execute("account_owner_report_reader", { "arguments": JSON.stringify({}) })
+
+        .then(function(response) {
+
+            var data = findPayload(response);
+
+            if (!data || !Array.isArray(data.owners)) {
+                container.innerHTML = '<div class="error">Could not load Account Owner Summary.</div>';
+                return;
+            }
+
+            renderAccountOwnerSummary(data);
+
+        })
+
+        .catch(function() {
+            container.innerHTML = '<div class="error">Unable to load Account Owner Summary.</div>';
+        });
+
+}
+
+
+function renderAccountOwnerSummary(data) {
+
+    var container = document.getElementById("accountOwnerSummarySection");
+    var ordered_stages = data.ordered_stages || [];
+
+    var html = '<table><thead><tr>';
+    html += '<th style="text-align:left;">Account Owner</th><th>Total</th><th>Last 30</th>';
+    html += '<th>31-60</th><th>60+</th><th>Touched</th><th>Non-Touched</th><th>With Deal</th><th>No Deal</th>';
+    ordered_stages.forEach(function(s) { html += '<th>' + escapeHtml(s) + '</th>'; });
+    html += '</tr></thead><tbody>';
+
+    (data.owners || []).forEach(function(owner) {
+
+        var deals = owner.deals_fy || { with_deal: 0, no_deal: 0, stages: {} };
+
+        html += '<tr>';
+        html += '<td class="row-label">' + escapeHtml(owner.owner_name) + '</td>';
+        html += '<td>' + owner.total_accounts + '</td><td>' + owner.last_30 + '</td>';
+        html += '<td>' + owner.days_31_60 + '</td><td>' + owner.days_60_plus + '</td>';
+        html += '<td>' + owner.touched + '</td><td>' + owner.non_touched + '</td>';
+        html += '<td>' + deals.with_deal + '</td><td>' + deals.no_deal + '</td>';
+
+        ordered_stages.forEach(function(s) {
+            html += '<td>' + ((deals.stages && deals.stages[s]) || 0) + '</td>';
+        });
+
+        html += '</tr>';
+
+    });
+
+    var grand = data.grand || {};
+    var grandDeals = grand.deals_fy || { with_deal: 0, no_deal: 0, stages: {} };
+
+    html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
+    html += '<td>' + (grand.total_accounts || 0) + '</td><td>' + (grand.last_30 || 0) + '</td>';
+    html += '<td>' + (grand.days_31_60 || 0) + '</td><td>' + (grand.days_60_plus || 0) + '</td>';
+    html += '<td>' + (grand.touched || 0) + '</td><td>' + (grand.non_touched || 0) + '</td>';
+    html += '<td>' + grandDeals.with_deal + '</td><td>' + grandDeals.no_deal + '</td>';
+
+    ordered_stages.forEach(function(s) {
+        html += '<td>' + ((grandDeals.stages && grandDeals.stages[s]) || 0) + '</td>';
+    });
+
+    html += '</tr></tbody></table>';
+
+    container.innerHTML = html;
 
 }
 
