@@ -347,7 +347,7 @@ function findPayload(response, depth) {
 
     if (typeof response === "object") {
 
-        if (response.per_owner || response.status === "error") {
+        if (response.per_owner || Array.isArray(response.owners) || response.status === "error") {
             return response;
         }
 
@@ -707,6 +707,7 @@ function categoryLabel(category) {
     if (category.indexOf("quarter:") === 0) return category.substring(8) + " Expected Business";
     if (category.indexOf("plan:") === 0) return category.substring(5) + " Expected Business";
     if (category.indexOf("stage:") === 0) return category.substring(6) + " Deals";
+    if (category.indexOf("aor:") === 0) return category.substring(4).replace(/_/g, " ").replace(/^stage:/, "") + " (Account Owner Summary)";
 
     return category;
 }
@@ -752,6 +753,10 @@ function closeDrilldown() {
 
 
 async function runDrilldown(ownerId, ownerName, category) {
+
+    if (category.indexOf("aor:") === 0) {
+        return runDrilldownAOR(ownerId, category);
+    }
 
     var isAllOwners = !ownerId;
 
@@ -972,6 +977,13 @@ function renderAccountOwnerSummary(data) {
     var container = document.getElementById("accountOwnerSummarySection");
     var ordered_stages = data.ordered_stages || [];
 
+    function cell(count, ownerId, category) {
+        if (count && count > 0 && ownerId) {
+            return '<td class="clickable" data-owner-id="' + escapeHtml(ownerId) + '" data-cat="' + escapeHtml(category) + '">' + count + '</td>';
+        }
+        return '<td>' + count + '</td>';
+    }
+
     var html = '<table><thead><tr>';
     html += '<th style="text-align:left;">Account Owner</th><th>Total</th><th>Last 30</th>';
     html += '<th>31-60</th><th>60+</th><th>Touched</th><th>Non-Touched</th><th>With Deal</th><th>No Deal</th>';
@@ -981,16 +993,22 @@ function renderAccountOwnerSummary(data) {
     (data.owners || []).forEach(function(owner) {
 
         var deals = owner.deals_fy || { with_deal: 0, no_deal: 0, stages: {} };
+        var ownerId = owner.owner_id;
 
         html += '<tr>';
         html += '<td class="row-label">' + escapeHtml(owner.owner_name) + '</td>';
-        html += '<td>' + owner.total_accounts + '</td><td>' + owner.last_30 + '</td>';
-        html += '<td>' + owner.days_31_60 + '</td><td>' + owner.days_60_plus + '</td>';
-        html += '<td>' + owner.touched + '</td><td>' + owner.non_touched + '</td>';
-        html += '<td>' + deals.with_deal + '</td><td>' + deals.no_deal + '</td>';
+        html += cell(owner.total_accounts, ownerId, "aor:total");
+        html += cell(owner.last_30, ownerId, "aor:last_30");
+        html += cell(owner.days_31_60, ownerId, "aor:days_31_60");
+        html += cell(owner.days_60_plus, ownerId, "aor:days_60_plus");
+        html += cell(owner.touched, ownerId, "aor:touched");
+        html += cell(owner.non_touched, ownerId, "aor:non_touched");
+        html += cell(deals.with_deal, ownerId, "aor:with_deal");
+        html += cell(deals.no_deal, ownerId, "aor:no_deal");
 
         ordered_stages.forEach(function(s) {
-            html += '<td>' + ((deals.stages && deals.stages[s]) || 0) + '</td>';
+            var count = (deals.stages && deals.stages[s]) || 0;
+            html += cell(count, ownerId, "aor:stage:" + s);
         });
 
         html += '</tr>';
@@ -1013,6 +1031,116 @@ function renderAccountOwnerSummary(data) {
     html += '</tr></tbody></table>';
 
     container.innerHTML = html;
+
+    container.querySelectorAll(".clickable").forEach(function(el) {
+        el.onclick = function() {
+            var ownerId = el.getAttribute("data-owner-id");
+            var category = el.getAttribute("data-cat");
+            var row = el.closest("tr");
+            var ownerName = row ? row.querySelector("td.row-label").innerText : "";
+            openDrilldown(ownerId, ownerName, category);
+        };
+    });
+
+}
+
+
+async function runDrilldownAOR(ownerId, category) {
+
+    // category arrives as "aor:xxx" - strip the prefix
+    var innerCategory = category.substring(4);
+
+    var accounts = await zohoSearchAll("Accounts", "(Owner:equals:" + ownerId + ")");
+
+    var accountById = {};
+    accounts.forEach(function(a) {
+        if (a.id) accountById[String(a.id)] = { name: a.Account_Name || "" };
+    });
+
+    var accountIds = Object.keys(accountById);
+    if (accountIds.length === 0) return [];
+
+    if (innerCategory === "total") {
+        return Object.values(accountById).map(function(a) { return a.name; }).sort();
+    }
+
+    var calls = await zohoSearchAll("Calls", "(Owner:equals:" + ownerId + ")");
+
+    var latestCallByAccount = {};
+
+    calls.forEach(function(call) {
+        var whatId = ddLookupId(call.What_Id);
+        if (!whatId || !accountById[whatId]) return;
+        var callDate = ddParseDate(call.Call_Start_Time);
+        if (!callDate) return;
+        if (!latestCallByAccount[whatId] || callDate > latestCallByAccount[whatId]) {
+            latestCallByAccount[whatId] = callDate;
+        }
+    });
+
+    var needsDeals = (innerCategory === "with_deal" || innerCategory === "no_deal" || innerCategory.indexOf("stage:") === 0);
+    var latestDealByAccount = {};
+
+    if (needsDeals) {
+
+        var batchSize = 10;
+
+        for (var i = 0; i < accountIds.length; i += batchSize) {
+
+            var batch = accountIds.slice(i, i + batchSize);
+            var orCriteria = "(" + batch.map(function(id) { return "(Account_Name:equals:" + id + ")"; }).join("or") + ")";
+
+            var deals = await zohoSearchAll("Deals", orCriteria);
+
+            deals.forEach(function(deal) {
+                var accId = ddLookupId(deal.Account_Name);
+                if (!accId || !accountById[accId]) return;
+                var dealDate = ddParseDate(deal.Modified_Time) || ddParseDate(deal.Created_Time);
+                if (!dealDate) return;
+                var existing = latestDealByAccount[accId];
+                if (!existing || dealDate > existing.date) {
+                    latestDealByAccount[accId] = { date: dealDate, stage: deal.Stage || "Unknown" };
+                }
+            });
+        }
+    }
+
+    var now = new Date();
+    var matches = [];
+
+    accountIds.forEach(function(accId) {
+
+        var account = accountById[accId];
+        var lastCall = latestCallByAccount[accId];
+        var lastDeal = latestDealByAccount[accId];
+
+        var touched = !!lastCall;
+        var agingBucket = null;
+
+        if (touched) {
+            var daysOld = (now - lastCall) / 86400000;
+            if (daysOld <= 30) agingBucket = "last_30";
+            else if (daysOld <= 60) agingBucket = "days_31_60";
+            else agingBucket = "days_60_plus";
+        }
+
+        var withDeal = !!lastDeal;
+        var stage = lastDeal ? lastDeal.stage : null;
+
+        var isMatch = false;
+
+        if (innerCategory === "touched") isMatch = touched;
+        else if (innerCategory === "non_touched") isMatch = !touched;
+        else if (["last_30", "days_31_60", "days_60_plus"].indexOf(innerCategory) !== -1) isMatch = (agingBucket === innerCategory);
+        else if (innerCategory === "with_deal") isMatch = withDeal;
+        else if (innerCategory === "no_deal") isMatch = !withDeal;
+        else if (innerCategory.indexOf("stage:") === 0) isMatch = withDeal && stage === innerCategory.substring(6);
+
+        if (isMatch) matches.push(account.name);
+
+    });
+
+    return matches.sort();
 
 }
 
