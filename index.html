@@ -219,7 +219,7 @@
 var FY_START_YEAR = 2026;
 var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2) value
 
-/* Tables, funnel and summary need an Expected Closing Date inside the FY. The top amount cards don't. */
+/* Tables, funnel and summary need an Expected Order Date inside the FY. The top amount cards don't. */
 var REQUIRE_CLOSING_DATE_IN_FY = true;
 
 /* Only deals with one of these Deal Type values are used anywhere on the dashboard */
@@ -236,7 +236,7 @@ var DEAL_FIELDS = {
     year: "",          // Year2
     product: "",       // a field labelled "Product"
     dealType: "",      // Type / a field labelled "Deal Type"
-    closingDate: ""    // "Expected Closing Date" (auto)
+    closingDate: ""    // "Expected Order Date" (auto)
 };
 var ACCOUNT_GIST_FIELD = "";   // Accounts: "Gist Account Owner"
 
@@ -757,12 +757,12 @@ function valueIsNewDealType(value) {
 function chooseClosingDateField(options, deals) {
     if (DEAL_FIELDS.closingDate) return describeField(DEAL_FIELDS.closingDate, options, true);
     var picked = pickByTiers(options, [
-        function(o) { return /expected clos(ing|ure) date/.test(optionText(o)); },
-        function(o) { return /expected.*clos/.test(optionText(o)); }
+        function(o) { return /expected order date/.test(optionText(o)); },
+        function(o) { return /expected.*order/.test(optionText(o)) && !/amount|value|qty|quantity/.test(optionText(o)); }
     ], function(api) { return countNonEmpty(deals, api); });
     if (picked) return picked;
     for (var i = 0; i < options.length; i++) {
-        if (/expected.*clos/.test(optionText(options[i]))) return { api: options[i].api, label: options[i].label, found: true };
+        if (/expected order date/.test(optionText(options[i]))) return { api: options[i].api, label: options[i].label, found: true };
     }
     return describeField("Closing_Date", options, false);
 }
@@ -1058,7 +1058,7 @@ function accountMatchesGist(account, gistSelection) {
 /*
  * Every number on the dashboard starts here: Deal Year, Deal Type = New,
  * linked account, Gist filter and quarter.
- * cardMode = true skips the "Expected Closing Date inside the FY" check (top cards).
+ * cardMode = true skips the "Expected Order Date inside the FY" check (top cards).
  */
 function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 
@@ -1096,7 +1096,7 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 }
 
 
-/* Charts and target table: Expected Closing Date in FY, no Knimbus Default, no removed stages */
+/* Charts and target table: Expected Order Date in FY, no Knimbus Default, no removed stages */
 function chartEligible(ctx) {
     if (REQUIRE_CLOSING_DATE_IN_FY && !ctx.inWindow) return false;
     if (hasExcludedProduct(ctx)) return false;
@@ -1808,7 +1808,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
             html += '<td>' + pctBadge(qa, qt) + '</td>';
         } else {
             html += teamAmountCell(fyAchieved, "team:" + idx + ":FY:achieved",
-                fyAchieved - inQuarters > 0.005 ? formatLakh(fyAchieved - inQuarters) + " has no Expected Closing Date in the FY" : "");
+                fyAchieved - inQuarters > 0.005 ? formatLakh(fyAchieved - inQuarters) + " has no Expected Order Date in the FY" : "");
             html += '<td>' + pctBadge(fyAchieved, teamFyTarget(row)) + '</td>';
             QUARTERS.forEach(function(q) {
                 var target = teamQuarterTarget(row, q);
@@ -1855,7 +1855,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
 
     html += '<div class="data-source">Achieved uses the same rules as the Achieved card: deal owner, Closed Won stages, ' +
         'Deal Type New, Deal Year ' + FY_FILTER + '. FY Achieved matches the card with All Quarters; each quarter uses the ' +
-        'deal\'s Expected Closing Date. ' + GIST_HQ_OWNER_NAME + ' deals are split into teams by the account\'s Gist Account Owner.</div>';
+        'deal\'s Expected Order Date. ' + GIST_HQ_OWNER_NAME + ' deals are split into teams by the account\'s Gist Account Owner.</div>';
 
     var unmatched = live.gistValues.filter(function(name) {
         if (name === GIST_NOT_ASSIGNED) return false;
@@ -1974,7 +1974,7 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
             rowTotal.count += cell.count;
         });
 
-        html += '<tr><td class="row-label">' + quarter +
+        html += '<tr><td class="row-label">' + quarter + ' (Target = ' + formatLakh(targets[quarter]) + ')' +
             '<span class="sub">' + QUARTER_INFO[quarter].range + '</span></td>';
 
         m.plans.forEach(function(plan) {
@@ -1995,7 +1995,8 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
     });
 
     if (m.quarters.length > 1) {
-        html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
+        var fyTarget = m.quarters.reduce(function(sum, q) { return sum + targets[q]; }, 0);
+        html += '<tr class="grand-total"><td class="row-label">Grand Total (Target = ' + formatLakh(fyTarget) + ')</td>';
         m.plans.forEach(function(plan) { html += '<td>' + formatLakh(m.planTotals[plan].amount_lakh) + '</td>'; });
         html += '<td>' + formatLakh(grandPipeline.amount_lakh) + ' (' + accountsLabel(pipelineAccountCount) + ')</td>';
         html += '<td class="mix-col"></td></tr>';
@@ -2019,14 +2020,14 @@ function dataSourceNotes(m, live, missingOwners) {
         '), Plan = ' + escapeHtml(f.plan.label) + ' (' + escapeHtml(f.plan.api) +
         '), Product = ' + escapeHtml(f.product.label) + ' (' + escapeHtml(f.product.api) +
         '), Deal Type = ' + escapeHtml(f.dealType.label) + ' (' + escapeHtml(f.dealType.api) +
-        '), Expected Closing Date = ' + escapeHtml(f.closingDate.label) + ' (' + escapeHtml(f.closingDate.api) +
+        '), Expected Order Date = ' + escapeHtml(f.closingDate.label) + ' (' + escapeHtml(f.closingDate.api) +
         '), Year = ' + escapeHtml(f.year.label) + ' (' + escapeHtml(f.year.api) +
         '), Gist Account Owner = ' + escapeHtml(f.gist.label) + ' (' + escapeHtml(f.gist.api) + ').</div>';
 
     var warnings = [];
 
     if (!f.closingDate.found) {
-        warnings.push('No "Expected Closing Date" field was found on Deals, so quarters use "' + escapeHtml(f.closingDate.label) +
+        warnings.push('No "Expected Order Date" field was found on Deals, so quarters use "' + escapeHtml(f.closingDate.label) +
             '". Set <code>DEAL_FIELDS.closingDate</code> to its API name.');
     }
     if ((missingOwners || []).length) {
@@ -2044,7 +2045,7 @@ function dataSourceNotes(m, live, missingOwners) {
         warnings.push('No deal has Deal Year ' + FY_FILTER + '. Set <code>DEAL_FIELDS.year</code> to your Deal Year API name.');
     }
     if (REQUIRE_CLOSING_DATE_IN_FY && live.outsideWindow > 0) {
-        warnings.push(live.outsideWindow + ' deals have Deal Year ' + FY_FILTER + ' but an Expected Closing Date outside 1 Apr ' +
+        warnings.push(live.outsideWindow + ' deals have Deal Year ' + FY_FILTER + ' but an Expected Order Date outside 1 Apr ' +
             FY_START_YEAR + ' - 31 Mar ' + (FY_START_YEAR + 1) + '. They are counted in the top cards but not in these ' +
             'tables or the funnel.');
     }
@@ -2285,7 +2286,7 @@ function renderAccountOwnerSummary() {
     html += '</tbody></table></div>';
     html += '<div class="data-source">Accounts with at least one Deal Type New deal. ' +
         'Closed Won and Closed Lost count those accounts with a deal in that stage group, Deal Year ' + FY_FILTER +
-        ', Expected Closing Date in the selected period.</div>';
+        ', Expected Order Date in the selected period.</div>';
 
     container.innerHTML = html;
 
