@@ -10,77 +10,32 @@
     <style>
         * { box-sizing: border-box; }
 
-        body {
-            margin: 0;
-            padding: 20px;
-            font-family: Arial, Helvetica, sans-serif;
-            background: #f5f7fa;
-            color: #333;
-        }
+        body { margin: 0; padding: 20px; font-family: Arial, Helvetica, sans-serif; background: #f5f7fa; color: #333; }
 
         .container { max-width: 1300px; margin: 0 auto; }
 
         .header {
-            background: #ffffff;
-            padding: 20px 25px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            background: #ffffff; padding: 20px 25px; border-radius: 10px; margin-bottom: 20px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
         }
 
         .header h1 { margin: 0 0 4px 0; font-size: 22px; color: #1f2937; }
         .header p { margin: 0; color: #6b7280; font-size: 13px; }
 
         .header-controls { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-
         .filter-group { display: flex; flex-direction: column; gap: 3px; }
         .filter-group label { font-size: 11px; color: #6b7280; }
         .filter-group.hidden { display: none; }
+        .filter-group select { padding: 8px 12px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px; min-width: 190px; background: #ffffff; }
 
-        .filter-group select {
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid #d1d5db;
-            font-size: 14px;
-            min-width: 190px;
-            background: #ffffff;
-        }
-
-        #refreshButton {
-            background: #2563eb;
-            color: #ffffff;
-            border: none;
-            padding: 9px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
+        #refreshButton { background: #2563eb; color: #ffffff; border: none; padding: 9px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; }
         #refreshButton:disabled { background: #9ca3af; }
 
         .last-updated { font-size: 12px; color: #6b7280; padding-bottom: 9px; }
 
-        .card-row {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .card {
-            background: #ffffff;
-            border-radius: 10px;
-            padding: 18px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            text-align: center;
-        }
-
+        .card-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px; }
+        .card { background: #ffffff; border-radius: 10px; padding: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; }
         .card-title { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
         .card-value { font-size: 26px; font-weight: bold; color: #111827; }
         .card-value.target { color: #7c3aed; }
@@ -90,81 +45,41 @@
         .card-sub { font-size: 12px; color: #6b7280; margin-top: 6px; min-height: 15px; }
         .card-sub strong { color: #374151; }
 
-        .section {
-            background: #ffffff;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
-        }
-
+        .section { background: #ffffff; border-radius: 10px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 20px; }
         .section h2 { margin: 0 0 15px 0; font-size: 17px; color: #1f2937; }
+        .section h3 { margin: 22px 0 10px 0; font-size: 15px; color: #1f2937; }
+        .section h3:first-of-type { margin-top: 0; }
+        .section-note { font-size: 12px; color: #6b7280; margin: -8px 0 12px 0; }
 
         .table-scroll { overflow-x: auto; }
-
         table { border-collapse: collapse; width: 100%; }
-
-        th, td {
-            border: 1px solid #d0d7de;
-            padding: 8px 10px;
-            text-align: center;
-            font-size: 13px;
-        }
-
+        th, td { border: 1px solid #d0d7de; padding: 8px 10px; text-align: center; font-size: 13px; }
         th { background: #1f4e78; color: #ffffff; }
-
+        th.current-q { background: #15406a; box-shadow: inset 0 -3px 0 #f0b429; }
         td.row-label { text-align: left; font-weight: 600; }
         td.row-label .sub { display: block; font-weight: 400; font-size: 11px; color: #6b7280; }
-
         tr.grand-total { background: #d9eaf7; font-weight: 700; }
         tbody tr:nth-child(even) { background: #f7f9fb; }
+
+        tr.sub-row td { background: #fbfcfe; font-size: 12px; }
+        tr.sub-row td.row-label { font-weight: 400; padding-left: 28px; color: #374151; }
+
+        .expand-btn {
+            border: 1px solid #c7d2df; background: #ffffff; color: #1f4e78; border-radius: 4px;
+            font-size: 11px; padding: 1px 6px; margin-left: 8px; cursor: pointer;
+        }
 
         .loading { padding: 30px; text-align: center; color: #6b7280; }
         .error { padding: 15px; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 14px; }
 
         .card-value.clickable, td.clickable, .funnel-row.clickable { cursor: pointer; }
-
-        .card-value.clickable, td.clickable .big, td.clickable.plain {
-            text-decoration: underline;
-            text-decoration-style: dotted;
-            text-decoration-color: #93c5fd;
-        }
-
+        .card-value.clickable, td.clickable .big, td.clickable.plain { text-decoration: underline; text-decoration-style: dotted; text-decoration-color: #93c5fd; }
         .card-value.clickable:hover, td.clickable:hover { opacity: 0.75; }
 
-        /* ---- Modal ---- */
-
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.45);
-            z-index: 100;
-            align-items: center;
-            justify-content: center;
-        }
-
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
         .modal-overlay.open { display: flex; }
-
-        .modal-box {
-            background: #ffffff;
-            border-radius: 10px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 70vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        .modal-header {
-            padding: 16px 20px;
-            border-bottom: 1px solid #e5e7eb;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
+        .modal-box { background: #ffffff; border-radius: 10px; max-width: 500px; width: 90%; max-height: 70vh; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .modal-header { padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
         .modal-header h3 { margin: 0; font-size: 16px; color: #1f2937; }
         .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #6b7280; line-height: 1; }
         .modal-body { padding: 12px 20px; overflow-y: auto; }
@@ -173,38 +88,14 @@
         .modal-empty { color: #6b7280; font-size: 13px; padding: 10px 0; }
         .modal-count { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
 
-        /* ---- Expected business ---- */
-
-        .eb-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-            gap: 12px;
-            margin-bottom: 16px;
-        }
-
-        .eb-tile {
-            border: 1px solid #dbe3ec;
-            border-left: 5px solid #1f4e78;
-            border-radius: 7px;
-            padding: 10px 14px;
-            background: #f8fafc;
-        }
-
+        .eb-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .eb-tile { border: 1px solid #dbe3ec; border-left: 5px solid #1f4e78; border-radius: 7px; padding: 10px 14px; background: #f8fafc; }
         .eb-tile .label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; }
         .eb-tile .value { display: block; font-size: 20px; font-weight: 700; color: #111827; }
         .eb-tile .sub { display: block; font-size: 11px; color: #6b7280; margin-top: 2px; }
 
         .eb-table th { white-space: nowrap; }
-
-        .plan-dot {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 2px;
-            margin-right: 6px;
-            vertical-align: middle;
-            border: 1px solid rgba(255,255,255,0.7);
-        }
+        .plan-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: middle; border: 1px solid rgba(255,255,255,0.7); }
 
         .amount-cell .big { font-size: 15px; font-weight: 700; display: block; color: #1f2937; }
         .amount-cell .small { font-size: 11px; color: #6b7280; }
@@ -216,51 +107,30 @@
         .mix-bar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; background: #eef1f5; }
         .mix-bar span { display: block; height: 100%; }
 
+        .pct { display: inline-block; margin-top: 3px; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .pct.good { background: #d1fae5; color: #065f46; }
+        .pct.ok { background: #fef3c7; color: #92400e; }
+        .pct.low { background: #fee2e2; color: #991b1b; }
+        .pct.none { background: #eef1f5; color: #6b7280; font-weight: 400; }
+
+        .team-table td.q-cell .big { display: block; font-size: 14px; font-weight: 700; color: #1f2937; }
+        .team-table td.q-cell .small { display: block; font-size: 11px; color: #6b7280; }
+
         .data-source { margin-top: 10px; font-size: 12px; color: #6b7280; line-height: 1.5; }
-
-        .warn-note {
-            margin-top: 10px;
-            padding: 10px 12px;
-            background: #fffbeb;
-            border: 1px solid #fde68a;
-            border-radius: 6px;
-            color: #92400e;
-            font-size: 13px;
-        }
-
+        .warn-note { margin-top: 10px; padding: 10px 12px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; color: #92400e; font-size: 13px; }
         .warn-note code { background: #fef3c7; padding: 1px 4px; border-radius: 3px; }
 
-        /* ---- Stage funnel ---- */
-
         .funnel { display: flex; flex-direction: column; gap: 6px; }
-
-        .funnel-row {
-            display: grid;
-            grid-template-columns: 230px 1fr 140px;
-            align-items: center;
-            gap: 12px;
-            padding: 4px 6px;
-            border-radius: 6px;
-        }
-
+        .funnel-row { display: grid; grid-template-columns: 230px 1fr 140px; align-items: center; gap: 12px; padding: 4px 6px; border-radius: 6px; }
         .funnel-row:hover { background: #f3f4f6; }
         .funnel-stage { font-size: 13px; font-weight: 600; color: #1f2937; }
+        .funnel-stage .sub { display: block; font-size: 11px; font-weight: 400; color: #6b7280; }
         .funnel-track { display: flex; justify-content: center; }
         .funnel-bar { height: 26px; border-radius: 4px; min-width: 6px; }
         .funnel-value { text-align: right; }
         .funnel-value .big { display: block; font-size: 14px; font-weight: 700; color: #1f2937; }
         .funnel-value .small { font-size: 11px; color: #6b7280; }
-
-        .funnel-total {
-            margin-top: 8px;
-            padding-top: 10px;
-            border-top: 1px solid #e5e7eb;
-            font-size: 13px;
-            color: #374151;
-            text-align: right;
-        }
-
-        .section-note { font-size: 12px; color: #6b7280; margin: -8px 0 12px 0; }
+        .funnel-total { margin-top: 8px; padding-top: 10px; border-top: 1px solid #e5e7eb; font-size: 13px; color: #374151; text-align: right; }
 
         @media (max-width: 900px) {
             .card-row { grid-template-columns: repeat(2, 1fr); }
@@ -277,7 +147,7 @@
     <div class="header">
         <div>
             <h1>Management Dashboard</h1>
-            <p>Owner-filterable target, activity, and pipeline overview</p>
+            <p>Owner-filterable target, activity, and pipeline overview (Deal Type: New)</p>
         </div>
         <div class="header-controls">
             <div class="filter-group">
@@ -323,7 +193,6 @@
         <div class="modal-body" id="drilldownBody">Loading...</div>
     </div>
 </div>
-
 <script>
 
 /* =========================================================
@@ -332,73 +201,78 @@
 
 /* Financial year: 1 April FY_START_YEAR to 31 March FY_START_YEAR + 1 */
 var FY_START_YEAR = 2026;
+var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2) value
 
-/* Deal Year value the dashboard is scoped to (your Year2 field) */
-var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);
+/* Tables, funnel and summary need a Closing Date inside the FY. The top amount cards don't. */
+var REQUIRE_CLOSING_DATE_IN_FY = true;
 
-/*
- * true  = a deal counts only if its Closing Date is between 1 Apr 2026 and 31 Mar 2027
- * false = Closing Date outside that range is still counted under "All Quarters"
- */
-var REQUIRE_CLOSING_DATE_IN_FY = true;   // tables, funnel and summary only
-
-/*
- * The four amount cards (Achieved, Payment Received, Payment Pending,
- * Current Pipeline) use Stage + Deal Year + Expected Business only.
- * Closing Date is used for them only when a specific quarter is chosen.
- */
+/* Only deals with one of these Deal Type values are used anywhere on the dashboard */
+var DEAL_TYPE_VALUES = ["New", "New Business"];
 
 /*
  * Field API names. Leave "" to auto-detect. If the grey note under the
  * Quarter x Plan table shows the wrong field, type the correct API name
- * here (Setup > Developer Hub > APIs & SDKs > API Names).
+ * (Setup > Developer Hub > APIs & SDKs > API Names).
  */
 var DEAL_FIELDS = {
-    amount: "",              // Deals: the "Expected Business" field (auto)
-    plan: "",                // Deals: Deal_Category, else a field labelled "Plan"
-    year: "",                // Deals: Year2, else a field labelled "Year"
-    product: "",             // Deals: a field labelled "Product" (auto)
+    amount: "",        // "Expected Business"
+    plan: "",          // Deal_Category, else a field labelled "Plan"
+    year: "",          // Year2
+    product: "",       // a field labelled "Product"
+    dealType: "",      // Type / a field labelled "Deal Type"
     closingDate: "Closing_Date"
 };
+var ACCOUNT_GIST_FIELD = "";   // Accounts: "Gist Account Owner"
 
-/*
- * Current Pipeline = sum of Expected Business where Product isn't one of these.
- * Deals with no Product filled in are included (same as a Zoho "isn't" filter).
- */
-var PIPELINE_EXCLUDED_PRODUCTS = ["Knimbus Default"];
-var PIPELINE_OPEN_STAGES_ONLY = true;      // also leave out won and Closed Lost deals
-var PIPELINE_REQUIRE_SAME_OWNER = true;    // card only: deal owner must also own the account
+var AMOUNT_UNIT = "auto";      // "rupees", "lakh" or "auto"
 
-var ACCOUNT_GIST_FIELD = "";   // Accounts: field labelled "Gist Account Owner" (auto)
+/* Knimbus Default is removed from Current Pipeline, both charts and the target table */
+var EXCLUDED_PRODUCTS = ["Knimbus Default"];
+var PIPELINE_OPEN_STAGES_ONLY = true;
+var PIPELINE_REQUIRE_SAME_OWNER = true;   // Current Pipeline card: deal owner must own the account
+var EXCLUDE_LOST_FROM_EXPECTED = true;    // Closed Lost isn't counted as expected business
 
-/* "rupees" = stored like 1112000, "lakh" = stored like 11.12, "auto" = decide from the data */
-var AMOUNT_UNIT = "auto";
-
-/* Closed Lost deals are not counted as expected business (they still show in the stage funnel) */
-var EXCLUDE_LOST_FROM_EXPECTED = true;
-
-var ALLOWED_ACCOUNT_OWNERS = ["Anurag Mishra", "Tejal Pandya", "GIST HQ"];
+var ALLOWED_ACCOUNT_OWNERS = ["Anurag Mishra", "Tejal Pandya", "Ashish Kumar", "GIST HQ"];
 var GIST_HQ_OWNER_NAME = "GIST HQ";
+
+/* ---- Stages ---- */
+
+var STAGE_GROUPS = [
+    { name: "Qualification", stages: ["Qualification", "Lead"] },
+    { name: "Met and Interested", stages: ["Met and Interested"] },
+    { name: "Demonstrated and Queries Handled", stages: ["Demonstrated and Queries Handled"] },
+    { name: "Proposal Sent", stages: ["Proposal Sent", "Budgetary Proposal"] },
+    { name: "Negotiation & Review", stages: ["Negotiation/Review", "Negotiation & Review", "Negotiation and Review"] },
+    { name: "Proforma Invoice Sent", stages: ["Proforma Invoice Sent"] },
+    { name: "Invoice Sent", stages: ["Invoice Sent"] },
+    { name: "Closed Won", stages: ["Email Confirmation", "PI Sent - Order Received", "Payment Received",
+                                   "Part Payment Received", "Short Payment", "Closed Won"] },
+    { name: "Closed Lost", stages: ["Closed Lost", "Approval for Close Lost"] }
+];
+
+/* Deals in these stages are left out of the dashboard */
+var REMOVED_STAGES = ["Renewal Notice Sent", "Renewal Notice to be Sent"];
 
 var PAYMENT_RECEIVED_STAGES = ["Payment Received", "Short Payment", "Part Payment Received"];
 var PAYMENT_PENDING_STAGES = ["Order Booked", "Email Confirmation", "PI Sent - Order Received"];
-var CLOSED_WON_STAGES = PAYMENT_RECEIVED_STAGES.concat(PAYMENT_PENDING_STAGES, ["Closed Won"]);
-var CLOSED_LOST_STAGE = "Closed Lost";
 var EXCLUDED_DEAL_NAME_WORDS = ["test", "trigya"];
 
-var STAGE_ORDER = [
-    "Met and Interested",
-    "Demonstrated and Queries Handled",
-    "Proposal Sent",
-    "Negotiation/Review",
-    "PI Sent - Order Received",
-    "Email Confirmation",
-    "Order Booked",
-    "Part Payment Received",
-    "Short Payment",
-    "Payment Received",
-    "Closed Won",
-    "Closed Lost"
+/* ---- Sales team targets (in lakh) ----
+ * owners: CRM account owners whose accounts belong to this row (exact name)
+ * gist:   words matched inside the "Gist Account Owner" of GIST HQ accounts
+ * q:      Q1, Q2, Q3, Q4 targets     fy: full-year target
+ * monthTarget: current month target from the sales sheet
+ */
+var SALES_TEAM_TARGETS = [
+    { team: "Karthik & Vivekananda",     gist: ["Karthik", "Vivekanand"],    fy: 50,  q: [8, 12, 15, 15],        monthTarget: 4 },
+    { team: "Girish, Ruchi & Prasad",    gist: ["Girish", "Ruchi", "Prasad"], fy: 30,  q: [5, 7, 9, 9],           monthTarget: 2.3 },
+    { team: "Sharansh Gond",             gist: ["Sharansh"],                 fy: 25,  q: [4, 7, 7, 7],           monthTarget: 2.3 },
+    { team: "Anurag",                    owners: ["Anurag Mishra"],          fy: 45,  q: [2, 10.5, 13, 19.5],    monthTarget: 2.5 },
+    { team: "Tejal",                     owners: ["Tejal Pandya"],           fy: 25,  q: [1.5, 6, 8, 9.5],       monthTarget: 1.75 },
+    { team: "Ashish",                    owners: ["Ashish Kumar"],           fy: 15,  q: [2.5, 4.5, 3.5, 3.5],   monthTarget: 1.5 },
+    { team: "TSE - East",                gist: ["TSE"],                      fy: 10,  q: [0, 0, 3, 7],           monthTarget: 0 },
+    { team: "North (Suhail & Abhishek)", gist: ["Suhail", "Abhishek"],       fy: 0,   q: [0, 0, 0, 0],           monthTarget: 0 },
+    { team: "International",             gist: ["International"],            fy: 250, q: [15, 50, 80, 105],      monthTarget: 15 }
 ];
 
 var PLAN_COLORS = { "Plan A": "#d64550", "Plan B": "#f0b429", "Plan C": "#e8919c", "No Plan": "#9ca3af" };
@@ -413,18 +287,29 @@ var FY_SHORT_LABEL = "FY " + String(FY_START_YEAR).slice(2) + "-" + String(FY_ST
 var FY_LONG_LABEL = "FY " + FY_START_YEAR + "-" + String(FY_START_YEAR + 1).slice(2);
 var FY_START = new Date(FY_START_YEAR, 3, 1, 0, 0, 0, 0);
 var FY_END = new Date(FY_START_YEAR + 1, 2, 31, 23, 59, 59, 999);
+var QUARTERS = ["Q1", "Q2", "Q3", "Q4"];
 
 var QUARTER_INFO = {
-    Q1: { range: "1 Apr - 30 Jun " + FY_START_YEAR, short: "Apr-Jun " + FY_START_YEAR },
-    Q2: { range: "1 Jul - 30 Sep " + FY_START_YEAR, short: "Jul-Sep " + FY_START_YEAR },
-    Q3: { range: "1 Oct - 31 Dec " + FY_START_YEAR, short: "Oct-Dec " + FY_START_YEAR },
-    Q4: { range: "1 Jan - 31 Mar " + (FY_START_YEAR + 1), short: "Jan-Mar " + (FY_START_YEAR + 1) }
+    Q1: { range: "1 Apr - 30 Jun " + FY_START_YEAR },
+    Q2: { range: "1 Jul - 30 Sep " + FY_START_YEAR },
+    Q3: { range: "1 Oct - 31 Dec " + FY_START_YEAR },
+    Q4: { range: "1 Jan - 31 Mar " + (FY_START_YEAR + 1) }
 };
 
 var ALL_QUARTERS = "All Quarters";
 var GIST_ACCOUNT_OWNER_DEFAULT = "__all_gist__";
 var GIST_NOT_ASSIGNED = "(Not assigned)";
 var CARD_CATEGORIES = ["achieved", "payment_received", "payment_pending", "current_pipeline"];
+
+var STAGE_TO_GROUP = {};
+STAGE_GROUPS.forEach(function(g) {
+    g.stages.forEach(function(s) { STAGE_TO_GROUP[normStage(s)] = g.name; });
+});
+var REMOVED_STAGE_KEYS = REMOVED_STAGES.map(normStage);
+var CLOSED_WON_KEYS = STAGE_GROUPS.filter(function(g) { return g.name === "Closed Won"; })[0].stages.map(normStage);
+var CLOSED_LOST_KEYS = STAGE_GROUPS.filter(function(g) { return g.name === "Closed Lost"; })[0].stages.map(normStage);
+var PAYMENT_RECEIVED_KEYS = PAYMENT_RECEIVED_STAGES.map(normStage);
+var PAYMENT_PENDING_KEYS = PAYMENT_PENDING_STAGES.map(normStage);
 
 var lastReportData = null;
 var lastAccountOwnerSummaryData = null;
@@ -436,11 +321,17 @@ var fieldInfo = null;
 var amountUnitInUse = "rupees";
 var callsCache = {};
 var aorLive = null;
+var aorGistExpanded = false;
 
 populateQuarterFilter();
 
 ZOHO.embeddedApp.on("PageLoad", function() { loadReport(); loadAccountOwnerSummary(); });
 ZOHO.embeddedApp.init();
+
+
+function normStage(stage) {
+    return String(stage || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
 
 
 /* =========================================================
@@ -451,7 +342,7 @@ function populateQuarterFilter() {
     var select = document.getElementById("quarterFilter");
     var html = '<option value="' + ALL_QUARTERS + '">All Quarters (1 Apr ' + FY_START_YEAR +
         ' - 31 Mar ' + (FY_START_YEAR + 1) + ')</option>';
-    ["Q1", "Q2", "Q3", "Q4"].forEach(function(q) {
+    QUARTERS.forEach(function(q) {
         html += '<option value="' + q + '">' + q + ' (' + QUARTER_INFO[q].range + ')</option>';
     });
     select.innerHTML = html;
@@ -495,11 +386,8 @@ function populateGistOwnerFilter() {
     var values = liveResolved ? liveResolved.gistValues : [];
     var html = '<option value="' + GIST_ACCOUNT_OWNER_DEFAULT + '">All Gist Account Owners</option>';
 
-    if (!liveResolved) {
-        html += '<option disabled>Loading names...</option>';
-    } else if (values.length === 0) {
-        html += '<option disabled>No Gist Account Owner values found</option>';
-    }
+    if (!liveResolved) html += '<option disabled>Loading names...</option>';
+    else if (values.length === 0) html += '<option disabled>No Gist Account Owner values found</option>';
 
     values.forEach(function(name) {
         html += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
@@ -525,6 +413,79 @@ function currentQuarterSelection() {
 function periodLabel(selectedQuarter) {
     if (!selectedQuarter || selectedQuarter === ALL_QUARTERS) return FY_LONG_LABEL;
     return FY_LONG_LABEL + ", " + selectedQuarter + " (" + QUARTER_INFO[selectedQuarter].range + ")";
+}
+
+
+function currentFyQuarter() {
+    var today = new Date();
+    if (today < FY_START) return "Q1";
+    if (today > FY_END) return "Q4";
+    return monthQuarter(today);
+}
+
+
+/* =========================================================
+   SALES TEAM TARGETS
+   ========================================================= */
+
+function teamFyTarget(row) {
+    if (typeof row.fy === "number") return row.fy;
+    return (row.q || []).reduce(function(s, v) { return s + Number(v || 0); }, 0);
+}
+
+
+function teamQuarterTarget(row, quarter) {
+    return Number((row.q || [])[QUARTERS.indexOf(quarter)] || 0);
+}
+
+
+function teamTarget(row, selectedQuarter) {
+    return (!selectedQuarter || selectedQuarter === ALL_QUARTERS) ? teamFyTarget(row) : teamQuarterTarget(row, selectedQuarter);
+}
+
+
+function gistNameMatchesKeywords(name, keywords) {
+    var lower = String(name || "").toLowerCase();
+    return (keywords || []).some(function(k) { return k && lower.indexOf(String(k).trim().toLowerCase()) !== -1; });
+}
+
+
+function teamMatchesAccount(row, account) {
+    var owner = account.ownerName.trim().toLowerCase();
+    if ((row.owners || []).some(function(o) { return o.trim().toLowerCase() === owner; })) return true;
+    if (isGistHqName(account.ownerName) && (row.gist || []).length) {
+        return account.gistNames.some(function(n) { return gistNameMatchesKeywords(n, row.gist); });
+    }
+    return false;
+}
+
+
+function assignTeam(account) {
+    for (var i = 0; i < SALES_TEAM_TARGETS.length; i++) {
+        if (teamMatchesAccount(SALES_TEAM_TARGETS[i], account)) return i;
+    }
+    return -1;
+}
+
+
+/* Which target rows belong to the current owner / Gist filter */
+function teamRowsInScope(selectedOwner, gistSelection) {
+
+    return SALES_TEAM_TARGETS.map(function(row, index) { return { row: row, index: index }; }).filter(function(item) {
+
+        var row = item.row;
+
+        if (!selectedOwner || selectedOwner === "All Owners") return true;
+
+        if (isGistHqName(selectedOwner)) {
+            if (!(row.gist || []).length) return false;
+            if (gistSelection === GIST_ACCOUNT_OWNER_DEFAULT) return true;
+            if (gistSelection === GIST_NOT_ASSIGNED) return false;
+            return gistNameMatchesKeywords(gistSelection, row.gist);
+        }
+
+        return (row.owners || []).some(function(o) { return o.trim().toLowerCase() === selectedOwner.trim().toLowerCase(); });
+    });
 }
 
 
@@ -593,9 +554,7 @@ function findPayload(response, depth) {
 
     if (typeof response === "object") {
 
-        if (response.per_owner || Array.isArray(response.owners) || response.status === "error") {
-            return response;
-        }
+        if (response.per_owner || Array.isArray(response.owners) || response.status === "error") return response;
 
         var priorityKeys = ["output", "details", "result", "response", "data"];
 
@@ -619,8 +578,6 @@ function findPayload(response, depth) {
 
 /* =========================================================
    LIVE DEALS + ACCOUNTS
-   Loaded once and reused by every section and drilldown until
-   Refresh is clicked.
    ========================================================= */
 
 function loadLiveData() {
@@ -723,7 +680,6 @@ function describeField(api, options, found) {
 }
 
 
-/* Walks tiers in order; within a tier picks the field with the most filled-in values */
 function pickByTiers(options, tiers, scoreFn) {
     for (var t = 0; t < tiers.length; t++) {
         var best = null;
@@ -753,6 +709,19 @@ function countNonZero(records, api) {
 }
 
 
+function countDealTypeMatches(records, api) {
+    var n = 0;
+    records.forEach(function(r) { if (valueIsNewDealType(r[api])) n++; });
+    return n;
+}
+
+
+function valueIsNewDealType(value) {
+    var wanted = DEAL_TYPE_VALUES.map(function(v) { return v.trim().toLowerCase(); });
+    return fieldValueList(value).some(function(v) { return wanted.indexOf(v.trim().toLowerCase()) !== -1; });
+}
+
+
 function chooseYearField(options, deals) {
     if (DEAL_FIELDS.year) return describeField(DEAL_FIELDS.year, options, true);
     return pickByTiers(options, [
@@ -773,31 +742,17 @@ function isAmountLike(o) {
 
 function chooseAmountField(options, deals) {
     if (DEAL_FIELDS.amount) return describeField(DEAL_FIELDS.amount, options, true);
-    return pickByTiers(options, [
-        function(o) { return /expected ?business/.test(optionText(o)); },
-        function(o) { return o.api === "Amount"; },
-        function(o) { return isAmountLike(o) && /business|lakh/.test(optionText(o)); },
-        function(o) { return isAmountLike(o) && /expected|amount|value|revenue|total|price|deal size/.test(optionText(o)); }
-    ], function(api) { return countNonZero(deals, api); }) || expectedBusinessFallback(options);
-}
-
-
-function expectedBusinessFallback(options) {
+    var picked = pickByTiers(options, [
+        function(o) { return /expected ?business/.test(optionText(o)); }
+    ], function(api) { return countNonZero(deals, api); });
+    if (picked) return picked;
     for (var i = 0; i < options.length; i++) {
-        if (/expected ?business/.test(optionText(options[i]))) {
-            return { api: options[i].api, label: options[i].label, found: true };
-        }
+        if (/expected ?business/.test(optionText(options[i]))) return { api: options[i].api, label: options[i].label, found: true };
     }
-    return describeField("Amount", options, false);
-}
-
-
-function chooseProductField(options, deals) {
-    if (DEAL_FIELDS.product) return describeField(DEAL_FIELDS.product, options, true);
     return pickByTiers(options, [
-        function(o) { return o.api === "Product" || o.api === "Product_Name"; },
-        function(o) { return /\bproducts?\b/.test(optionText(o)) && !/amount|price|qty|quantity|code|id\b/.test(optionText(o)); }
-    ], function(api) { return countNonEmpty(deals, api); }) || describeField("Product", options, false);
+        function(o) { return o.api === "Amount"; },
+        function(o) { return isAmountLike(o) && /business|lakh|amount|value|revenue/.test(optionText(o)); }
+    ], function(api) { return countNonZero(deals, api); }) || describeField("Amount", options, false);
 }
 
 
@@ -808,6 +763,25 @@ function choosePlanField(options, deals) {
         function(o) { return /\bplan\b/.test(optionText(o)); },
         function(o) { return /categor/.test(optionText(o)); }
     ], function(api) { return countNonEmpty(deals, api); }) || describeField("Deal_Category", options, false);
+}
+
+
+function chooseProductField(options, deals) {
+    if (DEAL_FIELDS.product) return describeField(DEAL_FIELDS.product, options, true);
+    return pickByTiers(options, [
+        function(o) { return o.api === "Product" || o.api === "Product_Name"; },
+        function(o) { return /\bproducts?\b/.test(optionText(o)) && !/amount|price|qty|quantity|code|\bid\b/.test(optionText(o)); }
+    ], function(api) { return countNonEmpty(deals, api); }) || describeField("Product", options, false);
+}
+
+
+function chooseDealTypeField(options, deals) {
+    if (DEAL_FIELDS.dealType) return describeField(DEAL_FIELDS.dealType, options, true);
+    return pickByTiers(options, [
+        function(o) { return /deal ?type/.test(optionText(o)); },
+        function(o) { return o.api === "Type"; },
+        function(o) { return /\btype\b/.test(optionText(o)); }
+    ], function(api) { return countDealTypeMatches(deals, api); }) || describeField("Type", options, false);
 }
 
 
@@ -828,8 +802,9 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
 
     fieldInfo = { closingDate: DEAL_FIELDS.closingDate || "Closing_Date" };
     fieldInfo.year = chooseYearField(dealOptions, deals);
+    fieldInfo.dealType = chooseDealTypeField(dealOptions, deals);
 
-    var fyDeals = deals.filter(function(d) { return dealFiscalYear(d) === FY_FILTER; });
+    var fyDeals = deals.filter(function(d) { return dealFiscalYear(d) === FY_FILTER && dealTypeOk(d); });
     var scope = fyDeals.length ? fyDeals : deals;
 
     fieldInfo.amount = chooseAmountField(dealOptions, scope);
@@ -845,6 +820,7 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
     var ownerIdByName = {};
     var gistSet = {};
     var gistHasEmpty = false;
+    var teamAccountCounts = SALES_TEAM_TARGETS.map(function() { return 0; });
 
     accounts.forEach(function(a) {
 
@@ -854,7 +830,7 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
         var ownerId = ddLookupId(a.Owner);
         var gistNames = fieldValueList(a[fieldInfo.gist.api]);
 
-        accountsById[String(a.id)] = {
+        var account = {
             id: String(a.id),
             name: a.Account_Name || "(Unnamed Account)",
             ownerId: ownerId,
@@ -862,6 +838,11 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
             bucket: fieldValueText(a.Bucket_Type) || "No Bucket",
             gistNames: gistNames
         };
+
+        account.teamIndex = assignTeam(account);
+        if (account.teamIndex >= 0) teamAccountCounts[account.teamIndex]++;
+
+        accountsById[account.id] = account;
 
         if (ownerId) ownerIdByName[ownerName.trim().toLowerCase()] = ownerId;
 
@@ -884,9 +865,17 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
         ownerIdByName: ownerIdByName,
         gistValues: gistValues,
         gistHqAccountCount: gistHqAccounts.length,
+        teamAccountCounts: teamAccountCounts,
+        yearDealCount: deals.filter(function(d) { return dealFiscalYear(d) === FY_FILTER; }).length,
         fyDealCount: fyDeals.length,
         outsideWindow: outsideWindow
     };
+}
+
+
+function dealTypeOk(deal) {
+    if (!fieldInfo.dealType.found) return true;   // field not found: don't hide everything, a warning is shown
+    return valueIsNewDealType(deal[fieldInfo.dealType.api]);
 }
 
 
@@ -951,20 +940,48 @@ function isInFyWindow(date) {
 }
 
 
-function isClosedWonStage(stage) {
-    return CLOSED_WON_STAGES.indexOf(String(stage || "").trim()) !== -1;
+/* =========================================================
+   DEAL RULES
+   ========================================================= */
+
+function stageGroupOf(stage) {
+    var key = normStage(stage);
+    if (REMOVED_STAGE_KEYS.indexOf(key) !== -1) return null;
+    return STAGE_TO_GROUP[key] || String(stage || "").trim() || "Unknown";
 }
 
 
-function isCurrentPipelineStage(stage) {
-    var normalized = String(stage || "").trim();
-    return !isClosedWonStage(normalized) && normalized !== CLOSED_LOST_STAGE;
+function isRemovedStage(stage) {
+    return REMOVED_STAGE_KEYS.indexOf(normStage(stage)) !== -1;
+}
+
+
+function isClosedWonStage(stage) {
+    return CLOSED_WON_KEYS.indexOf(normStage(stage)) !== -1;
+}
+
+
+function isClosedLostStage(stage) {
+    return CLOSED_LOST_KEYS.indexOf(normStage(stage)) !== -1;
+}
+
+
+/* Open = not won, lost, removed, or waiting for payment (e.g. Order Booked) */
+function isOpenStage(stage) {
+    return !isClosedWonStage(stage) && !isClosedLostStage(stage) && !isRemovedStage(stage) &&
+        PAYMENT_PENDING_KEYS.indexOf(normStage(stage)) === -1;
 }
 
 
 function isExcludedTestDeal(deal) {
     var name = String((deal && deal.Deal_Name) || "").toLowerCase();
     return EXCLUDED_DEAL_NAME_WORDS.some(function(word) { return name.indexOf(word) !== -1; });
+}
+
+
+function hasExcludedProduct(ctx) {
+    var excluded = EXCLUDED_PRODUCTS.map(function(p) { return p.trim().toLowerCase(); });
+    return ctx.products.some(function(p) { return excluded.indexOf(p.trim().toLowerCase()) !== -1; });
 }
 
 
@@ -977,13 +994,14 @@ function accountMatchesGist(account, gistSelection) {
 
 
 /*
- * Shared per-deal filter (FY, closing-date quarter, Gist account owner).
- * Cards, charts, summary and every drilldown use it, so numbers and
- * popup lists always agree. Returns null when the deal is filtered out.
+ * Every number on the dashboard starts here: Deal Year, Deal Type = New,
+ * linked account, Gist filter and quarter.
+ * cardMode = true skips the "Closing Date inside the FY" check (top cards).
  */
 function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 
     if (dealFiscalYear(deal) !== FY_FILTER) return null;
+    if (!dealTypeOk(deal)) return null;
 
     var accId = ddLookupId(deal.Account_Name);
     if (!accId) return null;
@@ -1015,24 +1033,31 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 }
 
 
-/* Current Pipeline: Product isn't Knimbus Default (+ open stage if configured) */
+/* Charts and target table: Closing Date in FY, no Knimbus Default, no removed stages */
+function chartEligible(ctx) {
+    if (REQUIRE_CLOSING_DATE_IN_FY && !ctx.inWindow) return false;
+    if (hasExcludedProduct(ctx)) return false;
+    return stageGroupOf(ctx.stage) !== null;
+}
+
+
 function isPipelineDeal(ctx) {
-    var excluded = PIPELINE_EXCLUDED_PRODUCTS.map(function(p) { return p.trim().toLowerCase(); });
-    var hasExcludedProduct = ctx.products.some(function(p) { return excluded.indexOf(p.trim().toLowerCase()) !== -1; });
-    if (hasExcludedProduct) return false;
-    if (PIPELINE_OPEN_STAGES_ONLY && !isCurrentPipelineStage(ctx.stage)) return false;
+    if (hasExcludedProduct(ctx)) return false;
+    if (isRemovedStage(ctx.stage)) return false;
+    if (PIPELINE_OPEN_STAGES_ONLY && !isOpenStage(ctx.stage)) return false;
     return true;
 }
 
 
-/* Cards: scoped to the DEAL owner (same rule as the writer) */
+/* Cards: scoped to the DEAL owner */
 function matchesCardCategory(ctx, category, ownerId) {
 
     if (ownerId && ctx.dealOwnerId !== ownerId) return false;
+    if (isRemovedStage(ctx.stage)) return false;
 
     if (category === "achieved") return isClosedWonStage(ctx.stage) && !ctx.excluded;
-    if (category === "payment_received") return PAYMENT_RECEIVED_STAGES.indexOf(ctx.stage) !== -1 && !ctx.excluded;
-    if (category === "payment_pending") return PAYMENT_PENDING_STAGES.indexOf(ctx.stage) !== -1;
+    if (category === "payment_received") return PAYMENT_RECEIVED_KEYS.indexOf(normStage(ctx.stage)) !== -1 && !ctx.excluded;
+    if (category === "payment_pending") return PAYMENT_PENDING_KEYS.indexOf(normStage(ctx.stage)) !== -1;
     if (category === "current_pipeline") {
         if (!isPipelineDeal(ctx)) return false;
         return !PIPELINE_REQUIRE_SAME_OWNER || (!!ctx.account && ctx.account.ownerId === ctx.dealOwnerId);
@@ -1041,27 +1066,32 @@ function matchesCardCategory(ctx, category, ownerId) {
 }
 
 
-/* Charts and summary: scoped to the linked ACCOUNT owner */
+/* Charts and summary: scoped to the ACCOUNT owner */
 function matchesAccountOwner(ctx, ownerId) {
     return !ownerId || (!!ctx.account && ctx.account.ownerId === ownerId);
 }
 
 
 function countsAsExpected(ctx) {
-    return !(EXCLUDE_LOST_FROM_EXPECTED && ctx.stage === CLOSED_LOST_STAGE);
+    return !(EXCLUDE_LOST_FROM_EXPECTED && isClosedLostStage(ctx.stage));
 }
 
 
-function addAmount(target, key, amount) {
-    if (!target[key]) target[key] = { amount_lakh: 0, count: 0 };
+function addAmount(target, key, amount, accId) {
+    if (!target[key]) target[key] = { amount_lakh: 0, count: 0, accounts: {} };
     target[key].amount_lakh += amount;
     target[key].count += 1;
+    if (accId) target[key].accounts[accId] = true;
 }
 
+
+/* =========================================================
+   METRICS
+   ========================================================= */
 
 function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
 
-    var quarters = selectedQuarter && selectedQuarter !== ALL_QUARTERS ? [selectedQuarter] : ["Q1", "Q2", "Q3", "Q4"];
+    var quarters = selectedQuarter && selectedQuarter !== ALL_QUARTERS ? [selectedQuarter] : QUARTERS.slice();
 
     var m = {
         quarters: quarters,
@@ -1069,11 +1099,13 @@ function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
         matrix: {},
         pipelineByQuarter: {},
         planTotals: {},
-        stageTotals: {},
+        groupTotals: {},
+        groupByQuarter: {},
+        groupStages: {},
         cards: { achieved: 0, payment_received: 0, payment_pending: 0, current_pipeline: 0 },
         pipelineAccounts: {},
         pipelineTableAccounts: {},
-        periodDeals: 0,
+        chartDeals: 0,
         dealsWithAmount: 0,
         dealsWithPlan: 0
     };
@@ -1085,7 +1117,6 @@ function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
 
     live.deals.forEach(function(deal) {
 
-        // Cards: Stage + Deal Year + Expected Business (no closing-date window)
         var ctx = dealContext(deal, live, selectedQuarter, gistSelection, true);
         if (!ctx) return;
 
@@ -1095,22 +1126,27 @@ function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
             if (category === "current_pipeline") m.pipelineAccounts[ctx.accId] = true;
         });
 
-        // Tables and funnel: also need the Closing Date inside the FY
-        if (REQUIRE_CLOSING_DATE_IN_FY && !ctx.inWindow) return;
+        if (!chartEligible(ctx)) return;
 
-        m.periodDeals++;
+        m.chartDeals++;
         if (ctx.amount) m.dealsWithAmount++;
         if (ctx.plan !== "No Plan") m.dealsWithPlan++;
 
         if (!matchesAccountOwner(ctx, ownerId)) return;
 
-        addAmount(m.stageTotals, ctx.stage, ctx.amount);
+        var group = stageGroupOf(ctx.stage);
+        addAmount(m.groupTotals, group, ctx.amount, ctx.accId);
+        if (!m.groupStages[group]) m.groupStages[group] = {};
+        m.groupStages[group][ctx.stage] = true;
 
         if (!ctx.quarter) return;
 
+        if (!m.groupByQuarter[group]) m.groupByQuarter[group] = {};
+        addAmount(m.groupByQuarter[group], ctx.quarter, ctx.amount, ctx.accId);
+
         if (countsAsExpected(ctx)) {
-            addAmount(m.matrix[ctx.quarter], ctx.plan, ctx.amount);
-            addAmount(m.planTotals, ctx.plan, ctx.amount);
+            addAmount(m.matrix[ctx.quarter], ctx.plan, ctx.amount, ctx.accId);
+            addAmount(m.planTotals, ctx.plan, ctx.amount, ctx.accId);
         }
 
         if (isPipelineDeal(ctx)) {
@@ -1130,24 +1166,75 @@ function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
     });
     if (found.indexOf("No Plan") !== -1) m.plans.push("No Plan");
 
+    m.groups = orderedGroups(Object.keys(m.groupTotals));
+
     return m;
 }
 
 
-function computeWonLostByOwner(live, gistSelection, selectedQuarter) {
+function orderedGroups(present) {
+    var ordered = STAGE_GROUPS.map(function(g) { return g.name; }).filter(function(n) { return present.indexOf(n) !== -1; });
+    var closedIndex = ordered.indexOf("Closed Won");
+    var extras = present.filter(function(n) { return ordered.indexOf(n) === -1; }).sort();
+    // Stages that aren't in any group (e.g. Order Booked) sit just before Closed Won
+    if (closedIndex === -1) return ordered.concat(extras);
+    return ordered.slice(0, closedIndex).concat(extras, ordered.slice(closedIndex));
+}
 
-    var result = {};
+
+function computeTeamMetrics(live) {
+
+    var teams = SALES_TEAM_TARGETS.map(function() {
+        var t = { achieved: {}, pipelineA: {} };
+        QUARTERS.forEach(function(q) { t.achieved[q] = 0; t.pipelineA[q] = 0; });
+        return t;
+    });
 
     live.deals.forEach(function(deal) {
 
-        var ctx = dealContext(deal, live, selectedQuarter, gistSelection);
-        if (!ctx || !ctx.account) return;
+        var ctx = dealContext(deal, live, ALL_QUARTERS, GIST_ACCOUNT_OWNER_DEFAULT, false);
+        if (!ctx || !ctx.account || !ctx.quarter || !chartEligible(ctx)) return;
 
-        var key = ctx.account.ownerName.trim().toLowerCase();
-        if (!result[key]) result[key] = { won: {}, lost: {} };
+        var index = ctx.account.teamIndex;
+        if (index < 0) return;
 
-        if (isClosedWonStage(ctx.stage) && !ctx.excluded) result[key].won[ctx.accId] = true;
-        else if (ctx.stage === CLOSED_LOST_STAGE) result[key].lost[ctx.accId] = true;
+        if (isClosedWonStage(ctx.stage) && !ctx.excluded) teams[index].achieved[ctx.quarter] += ctx.amount;
+        if (isPipelineDeal(ctx) && ctx.plan.trim().toLowerCase() === "plan a") teams[index].pipelineA[ctx.quarter] += ctx.amount;
+    });
+
+    return teams;
+}
+
+
+function computeWonLost(live, selectedQuarter, gistSelection) {
+
+    var result = { owners: {}, gist: {} };
+
+    function bucketFor(map, key) {
+        if (!map[key]) map[key] = { won: {}, lost: {} };
+        return map[key];
+    }
+
+    live.deals.forEach(function(deal) {
+
+        var ctx = dealContext(deal, live, selectedQuarter, gistSelection, false);
+        if (!ctx || !ctx.account || isRemovedStage(ctx.stage)) return;
+
+        var isWon = isClosedWonStage(ctx.stage) && !ctx.excluded;
+        var isLost = isClosedLostStage(ctx.stage);
+        if (!isWon && !isLost) return;
+
+        var targets = [bucketFor(result.owners, ctx.account.ownerName.trim().toLowerCase())];
+
+        if (isGistHqName(ctx.account.ownerName)) {
+            var names = ctx.account.gistNames.length ? ctx.account.gistNames : [GIST_NOT_ASSIGNED];
+            names.forEach(function(n) { targets.push(bucketFor(result.gist, n)); });
+        }
+
+        targets.forEach(function(b) {
+            if (isWon) b.won[ctx.accId] = true;
+            else b.lost[ctx.accId] = true;
+        });
     });
 
     return result;
@@ -1155,7 +1242,7 @@ function computeWonLostByOwner(live, gistSelection, selectedQuarter) {
 
 
 /* =========================================================
-   ACCOUNT ACTIVITY (live, used when a Gist account owner is chosen)
+   ACCOUNT ACTIVITY (live)
    ========================================================= */
 
 function filterAccounts(live, ownerId, gistSelection) {
@@ -1182,7 +1269,6 @@ function getOwnerCalls(ownerId) {
 
     if (!callsCache[ownerId]) {
         callsCache[ownerId] = zohoSearchAll("Calls", "(Owner:equals:" + ownerId + ")").then(function(calls) {
-            // Zoho search stops at 2,000 results; fall back to the full list if we hit that
             if (calls.length >= 2000) {
                 return getAllCalls().then(function(all) {
                     return all.filter(function(c) { return ddLookupId(c.Owner) === ownerId; });
@@ -1271,6 +1357,29 @@ function resolveOwnerId(ownerName, live) {
 }
 
 
+function targetForFilters(selectedOwner, gistSelection, selectedQuarter, ownerCache) {
+
+    var rows = teamRowsInScope(selectedOwner, gistSelection);
+    var allQuarters = selectedQuarter === ALL_QUARTERS;
+
+    if (rows.length) {
+        var value = rows.reduce(function(sum, item) { return sum + teamTarget(item.row, selectedQuarter); }, 0);
+        var fy = rows.reduce(function(sum, item) { return sum + teamFyTarget(item.row); }, 0);
+        return {
+            value: value,
+            title: "Target (" + (allQuarters ? FY_LONG_LABEL : selectedQuarter) + ")",
+            sub: allQuarters ? rows.length + (rows.length === 1 ? " team" : " teams") : "FY target " + formatLakh(fy)
+        };
+    }
+
+    return {
+        value: Number(ownerCache.target_lakhs || 0),
+        title: "Target (" + FY_LONG_LABEL + ")",
+        sub: "From Sales_Targets"
+    };
+}
+
+
 function renderAll() {
 
     if (!lastReportData || !lastReportData.per_owner) return;
@@ -1282,8 +1391,11 @@ function renderAll() {
 
     var gistSelection = currentGistSelection();
     var gistActive = gistSelection !== GIST_ACCOUNT_OWNER_DEFAULT;
+    var ownerInCache = !!lastReportData.per_owner[selectedOwner];
     var ownerCache = lastReportData.per_owner[selectedOwner] || {};
+    var liveAccountStats = gistActive || !ownerInCache;
     var period = periodLabel(selectedQuarter);
+    var target = targetForFilters(selectedOwner, gistSelection, selectedQuarter, ownerCache);
 
     aorLive = null;
     updateSummaryTitle(selectedQuarter, gistSelection);
@@ -1291,34 +1403,37 @@ function renderAll() {
     var html = "";
 
     html += '<div class="card-row">';
-    html += cardHtml("Target (full FY)", Number(ownerCache.target_lakhs || 0).toFixed(2) + " L", "target", null);
+    html += cardHtml(target.title, formatLakh(target.value), "target", null, escapeHtml(target.sub));
     html += cardHtml("Achieved (Closed Won)", "Calculating...", "achieved waiting", "achieved");
     html += cardHtml("Payment Received", "Calculating...", "achieved waiting", "payment_received");
-    html += cardHtml("Payment Pending / Pipeline", "Calculating...", "pending waiting", "payment_pending");
+    html += cardHtml("Payment Pending", "Calculating...", "pending waiting", "payment_pending");
     html += '</div>';
 
-    html += '<div class="card-row">';
     var cachedTotal = ownerCache.total_accounts || 0;
-    html += cardHtml("Total Accounts", gistActive ? "Calculating..." : cachedTotal,
-        gistActive ? "waiting" : "", "total_accounts");
-    html += cardHtml("Untouched Accounts", gistActive ? "Calculating..." : (ownerCache.untouched || 0),
-        gistActive ? "pending waiting" : "pending", "untouched",
-        gistActive ? "" : accountShareSub(ownerCache.untouched, cachedTotal));
-    html += cardHtml("Touched", gistActive ? "Calculating..." : (ownerCache.touched || 0),
-        gistActive ? "achieved waiting" : "achieved", "touched",
-        gistActive ? "" : accountShareSub(ownerCache.touched, cachedTotal));
+
+    html += '<div class="card-row">';
+    html += cardHtml("Total Accounts", liveAccountStats ? "Calculating..." : cachedTotal,
+        liveAccountStats ? "waiting" : "", "total_accounts");
+    html += cardHtml("Untouched Accounts", liveAccountStats ? "Calculating..." : (ownerCache.untouched || 0),
+        liveAccountStats ? "pending waiting" : "pending", "untouched",
+        liveAccountStats ? "" : accountShareSub(ownerCache.untouched, cachedTotal));
+    html += cardHtml("Touched", liveAccountStats ? "Calculating..." : (ownerCache.touched || 0),
+        liveAccountStats ? "achieved waiting" : "achieved", "touched",
+        liveAccountStats ? "" : accountShareSub(ownerCache.touched, cachedTotal));
     html += cardHtml("Current Pipeline", "Calculating...", "pending waiting", "current_pipeline");
     html += '</div>';
 
     html += '<div class="section"><h2>Bucket-wise Activity</h2>';
     html += '<p class="section-note">Account activity is measured from today, so the quarter filter does not change it.</p>';
-    html += '<div id="bucketWrap">' +
-        (gistActive ? '<div class="loading">Calculating activity for the selected Gist account owner...</div>'
-                    : renderBucketTable(ownerCache.bucket_summary)) + '</div>';
+    html += '<div id="bucketWrap">' + (liveAccountStats
+        ? '<div class="loading">Calculating account activity...</div>'
+        : renderBucketTable(ownerCache.bucket_summary)) + '</div>';
     html += '</div>';
 
-    html += '<div class="section"><h2>Expected Business, ' + escapeHtml(period) + ' (Quarter &times; Plan)</h2>';
-    html += '<div id="expectedBusinessWrap"><div class="loading">Loading deals...</div></div>';
+    html += '<div class="section"><h2>Expected Business, ' + escapeHtml(period) + '</h2>';
+    html += '<h3>Target vs Achievement</h3><div id="teamTargetWrap"><div class="loading">Loading deals...</div></div>';
+    html += '<h3>Quarter &times; Plan</h3><div id="expectedBusinessWrap"><div class="loading">Loading deals...</div></div>';
+    html += '<h3>Stage &times; Quarter</h3><div id="stageQuarterWrap"><div class="loading">Loading deals...</div></div>';
     html += '</div>';
 
     html += '<div class="section"><h2>Stage-wise Expected Business, ' + escapeHtml(period) + '</h2>';
@@ -1336,7 +1451,6 @@ function renderAll() {
 
             if (myToken !== renderToken) return;
 
-            // Gist names become available once accounts are loaded
             populateGistOwnerFilter();
 
             var ownerId = resolveOwnerId(selectedOwner, live);
@@ -1348,19 +1462,24 @@ function renderAll() {
 
             var metrics = computeDealMetrics(live, ownerId, gistSelection, selectedQuarter);
 
-            updateAmountCards(metrics.cards, Number(ownerCache.target_lakhs || 0), metrics.pipelineAccounts);
+            updateAmountCards(metrics.cards, target.value, metrics.pipelineAccounts);
+            renderTeamTable(computeTeamMetrics(live), live, selectedOwner, gistSelection, selectedQuarter);
             renderExpectedBusiness(metrics, live);
+            renderStageQuarterTable(metrics);
             renderStageFunnel(metrics);
 
             aorLive = {
-                wonLost: computeWonLostByOwner(live, gistSelection, selectedQuarter),
+                wonLost: computeWonLost(live, selectedQuarter, gistSelection),
                 gistActive: gistActive,
-                gistStats: null
+                gistStats: null,
+                gistBreakdown: null,
+                gistBreakdownLoading: false
             };
             updateAccountOwnerSummaryDisplay();
+            if (aorGistExpanded) ensureGistBreakdown();
             attachDrilldownHandlers(ownerId, selectedOwner);
 
-            if (!gistActive) return;
+            if (!liveAccountStats) return;
 
             var accounts = filterAccounts(live, ownerId, gistSelection);
             var calls = await getOwnerCalls(ownerId);
@@ -1378,8 +1497,10 @@ function renderAll() {
             var bucketWrap = document.getElementById("bucketWrap");
             if (bucketWrap) bucketWrap.innerHTML = renderBucketTable(stats.bucket_summary);
 
-            aorLive.gistStats = stats;
-            updateAccountOwnerSummaryDisplay();
+            if (gistActive) {
+                aorLive.gistStats = stats;
+                updateAccountOwnerSummaryDisplay();
+            }
             attachDrilldownHandlers(ownerId, selectedOwner);
         })
 
@@ -1393,9 +1514,10 @@ function renderAll() {
 
 function showLiveError(message) {
     var html = '<div class="error">' + escapeHtml(message) + '</div>';
-    ["expectedBusinessWrap", "stageFunnelWrap"].forEach(function(id) {
+    ["teamTargetWrap", "expectedBusinessWrap", "stageQuarterWrap", "stageFunnelWrap", "bucketWrap"].forEach(function(id) {
         var el = document.getElementById(id);
-        if (el) el.innerHTML = html;
+        if (el && el.querySelector && el.querySelector(".loading")) el.innerHTML = html;
+        else if (el && id !== "bucketWrap") el.innerHTML = html;
     });
     CARD_CATEGORIES.concat(["total_accounts", "untouched", "touched"]).forEach(function(cat) {
         var el = document.getElementById("card-" + cat);
@@ -1411,13 +1533,6 @@ function updateSummaryTitle(selectedQuarter, gistSelection) {
 }
 
 
-function updateAccountOwnerSummaryDisplay() {
-    if (!lastAccountOwnerSummaryData) return;
-    var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
-    renderAccountOwnerSummary(lastAccountOwnerSummaryData, selectedOwner);
-}
-
-
 function cardHtml(title, value, colorClass, category, sub) {
     var clickableClass = category ? " clickable" : "";
     var dataAttr = category ? ' data-cat="' + category + '"' : "";
@@ -1426,6 +1541,14 @@ function cardHtml(title, value, colorClass, category, sub) {
     return '<div class="card"><div class="card-title">' + escapeHtml(title) + '</div>' +
         '<div class="card-value ' + colorClass + clickableClass + '"' + idAttr + dataAttr + '>' + value + '</div>' +
         '<div class="card-sub"' + subId + '>' + (sub || "") + '</div></div>';
+}
+
+
+function setCardValue(category, value) {
+    var el = document.getElementById("card-" + category);
+    if (!el) return;
+    el.innerText = value;
+    el.classList.remove("waiting");
 }
 
 
@@ -1444,6 +1567,15 @@ function percentText(part, whole) {
 }
 
 
+function pctBadge(part, whole) {
+    var text = percentText(part, whole);
+    if (!text) return '<span class="pct none">No target</span>';
+    var pct = (Number(part) / Number(whole)) * 100;
+    var cls = pct >= 100 ? "good" : (pct >= 70 ? "ok" : "low");
+    return '<span class="pct ' + cls + '">' + text + '</span>';
+}
+
+
 function accountShareSub(count, total) {
     var pct = percentText(count, total);
     return pct ? '<strong>' + pct + '</strong> of ' + Number(total).toLocaleString("en-IN") + ' accounts' : "";
@@ -1453,14 +1585,6 @@ function accountShareSub(count, total) {
 function targetShareSub(amountLakh, targetLakh) {
     var pct = percentText(amountLakh, targetLakh);
     return pct ? '<strong>' + pct + '</strong> of ' + formatLakh(targetLakh) + ' target' : "No target set";
-}
-
-
-function setCardValue(category, value) {
-    var el = document.getElementById("card-" + category);
-    if (!el) return;
-    el.innerText = value;
-    el.classList.remove("waiting");
 }
 
 
@@ -1480,11 +1604,10 @@ function updateAmountCards(cards, targetLakh, pipelineAccounts) {
     CARD_CATEGORIES.forEach(function(category) {
         setCardValue(category, formatLakh(cards[category]));
     });
-    var pipelineCount = Object.keys(pipelineAccounts || {}).length;
-    setCardSub("current_pipeline", '<strong>' + pipelineCount.toLocaleString("en-IN") + '</strong>' +
-        (pipelineCount === 1 ? ' account' : ' accounts'));
     setCardSub("achieved", targetShareSub(cards.achieved, targetLakh));
     setCardSub("payment_received", targetShareSub(cards.payment_received, targetLakh));
+    var pipelineCount = Object.keys(pipelineAccounts || {}).length;
+    setCardSub("current_pipeline", '<strong>' + accountsLabel(pipelineCount) + '</strong>');
 }
 
 
@@ -1502,9 +1625,7 @@ function renderBucketTable(bucketSummary) {
     var grand = { Total: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, non_touched: 0 };
 
     function bucketCell(count, category) {
-        if (count && count > 0) {
-            return '<td class="clickable plain" data-cat="' + escapeHtml(category) + '">' + count + '</td>';
-        }
+        if (count && count > 0) return '<td class="clickable plain" data-cat="' + escapeHtml(category) + '">' + count + '</td>';
         return '<td>' + (count || 0) + '</td>';
     }
 
@@ -1529,11 +1650,146 @@ function renderBucketTable(bucketSummary) {
         '<td>' + grand.days_31_60 + '</td><td>' + grand.days_60_plus + '</td>' +
         '<td>' + grand.non_touched + '</td></tr>';
 
-    html += '</tbody></table></div>';
-
-    return html;
+    return html + '</tbody></table></div>';
 }
 
+
+/* ---- Target vs Achievement ---- */
+
+function renderTeamTable(teams, live, selectedOwner, gistSelection, selectedQuarter) {
+
+    var wrap = document.getElementById("teamTargetWrap");
+    if (!wrap) return;
+
+    var rows = teamRowsInScope(selectedOwner, gistSelection);
+
+    if (rows.length === 0) {
+        wrap.innerHTML = '<div class="loading">No sales team target is set for this selection. ' +
+            'Add it to SALES_TEAM_TARGETS at the top of the widget.</div>';
+        return;
+    }
+
+    var single = selectedQuarter !== ALL_QUARTERS;
+    var pipelineQuarter = single ? selectedQuarter : currentFyQuarter();
+    var nowQuarter = currentFyQuarter();
+
+    var html = '<div class="table-scroll"><table class="team-table"><thead><tr>';
+    html += '<th style="text-align:left;">Sales Manager</th><th>FY Target</th>';
+
+    if (single) {
+        html += '<th>' + selectedQuarter + ' Target</th><th>' + selectedQuarter + ' Achieved</th><th>Achv %</th>';
+    } else {
+        html += '<th>FY Achieved</th><th>Achv %</th>';
+        QUARTERS.forEach(function(q) {
+            html += '<th' + (q === nowQuarter ? ' class="current-q"' : '') + '>' + q +
+                '<br><span style="font-weight:400;font-size:11px;">Achieved / Target</span></th>';
+        });
+    }
+
+    html += '<th>Monthly Target</th><th>Pipeline (Plan A, ' + pipelineQuarter + ')</th></tr></thead><tbody>';
+
+    var total = { fy: 0, fyAchieved: 0, qTarget: {}, qAchieved: {}, month: 0, pipelineA: 0 };
+    QUARTERS.forEach(function(q) { total.qTarget[q] = 0; total.qAchieved[q] = 0; });
+
+    rows.forEach(function(item) {
+
+        var row = item.row;
+        var t = teams[item.index];
+        var fyAchieved = QUARTERS.reduce(function(s, q) { return s + t.achieved[q]; }, 0);
+        var accountCount = live.teamAccountCounts[item.index] || 0;
+        var idx = item.index;
+
+        html += '<tr><td class="row-label">' + escapeHtml(row.team) +
+            '<span class="sub">' + accountsLabel(accountCount) + '</span></td>';
+        html += '<td>' + formatLakh(teamFyTarget(row)) + '</td>';
+
+        if (single) {
+            var qt = teamQuarterTarget(row, selectedQuarter);
+            var qa = t.achieved[selectedQuarter];
+            html += '<td>' + formatLakh(qt) + '</td>';
+            html += teamAmountCell(qa, "team:" + idx + ":" + selectedQuarter + ":achieved");
+            html += '<td>' + pctBadge(qa, qt) + '</td>';
+        } else {
+            html += teamAmountCell(fyAchieved, "team:" + idx + ":FY:achieved");
+            html += '<td>' + pctBadge(fyAchieved, teamFyTarget(row)) + '</td>';
+            QUARTERS.forEach(function(q) {
+                var target = teamQuarterTarget(row, q);
+                var achieved = t.achieved[q];
+                html += '<td class="q-cell' + (achieved ? ' clickable' : '') + '"' +
+                    (achieved ? ' data-cat="team:' + idx + ':' + q + ':achieved"' : '') + '>' +
+                    '<span class="big">' + formatLakh(achieved) + '</span>' +
+                    '<span class="small">of ' + formatLakh(target) + '</span>' + pctBadge(achieved, target) + '</td>';
+            });
+        }
+
+        html += '<td>' + formatLakh(row.monthTarget || 0) + '</td>';
+        html += teamAmountCell(t.pipelineA[pipelineQuarter], "team:" + idx + ":" + pipelineQuarter + ":pipelineA");
+        html += '</tr>';
+
+        total.fy += teamFyTarget(row);
+        total.fyAchieved += fyAchieved;
+        total.month += Number(row.monthTarget || 0);
+        total.pipelineA += t.pipelineA[pipelineQuarter];
+        QUARTERS.forEach(function(q) {
+            total.qTarget[q] += teamQuarterTarget(row, q);
+            total.qAchieved[q] += t.achieved[q];
+        });
+    });
+
+    if (rows.length > 1) {
+        html += '<tr class="grand-total"><td class="row-label">Total</td><td>' + formatLakh(total.fy) + '</td>';
+        if (single) {
+            html += '<td>' + formatLakh(total.qTarget[selectedQuarter]) + '</td><td>' +
+                formatLakh(total.qAchieved[selectedQuarter]) + '</td><td>' +
+                pctBadge(total.qAchieved[selectedQuarter], total.qTarget[selectedQuarter]) + '</td>';
+        } else {
+            html += '<td>' + formatLakh(total.fyAchieved) + '</td><td>' + pctBadge(total.fyAchieved, total.fy) + '</td>';
+            QUARTERS.forEach(function(q) {
+                html += '<td class="q-cell"><span class="big">' + formatLakh(total.qAchieved[q]) + '</span>' +
+                    '<span class="small">of ' + formatLakh(total.qTarget[q]) + '</span>' +
+                    pctBadge(total.qAchieved[q], total.qTarget[q]) + '</td>';
+            });
+        }
+        html += '<td>' + formatLakh(total.month) + '</td><td>' + formatLakh(total.pipelineA) + '</td></tr>';
+    }
+
+    html += '</tbody></table></div>';
+
+    html += '<div class="data-source">Achieved = Closed Won stages, Deal Type New, Deal Year ' + FY_FILTER +
+        ', Closing Date in the quarter, Knimbus Default left out. Deals belong to a team through their account ' +
+        '(account owner, or Gist Account Owner for ' + GIST_HQ_OWNER_NAME + ' accounts).</div>';
+
+    var unmatched = live.gistValues.filter(function(name) {
+        if (name === GIST_NOT_ASSIGNED) return false;
+        return !SALES_TEAM_TARGETS.some(function(row) { return gistNameMatchesKeywords(name, row.gist); });
+    });
+
+    if (unmatched.length) {
+        html += '<div class="warn-note">These Gist Account Owner values are not in any team, so their deals are not ' +
+            'in this table: ' + unmatched.map(escapeHtml).join(", ") + '. Add them to a team\'s <code>gist</code> list ' +
+            'in SALES_TEAM_TARGETS.</div>';
+    }
+
+    var emptyTeams = rows.filter(function(item) {
+        return teamFyTarget(item.row) > 0 && !live.teamAccountCounts[item.index];
+    }).map(function(item) { return item.row.team; });
+
+    if (emptyTeams.length) {
+        html += '<div class="warn-note">No accounts matched: ' + emptyTeams.map(escapeHtml).join(", ") +
+            '. Check the owner names or Gist words for these teams in SALES_TEAM_TARGETS.</div>';
+    }
+
+    wrap.innerHTML = html;
+}
+
+
+function teamAmountCell(amount, category) {
+    var clickable = amount ? ' class="amount-cell clickable" data-cat="' + escapeHtml(category) + '"' : ' class="amount-cell zero"';
+    return '<td' + clickable + '><span class="big">' + formatLakh(amount) + '</span></td>';
+}
+
+
+/* ---- Quarter x Plan ---- */
 
 function planColor(plan, index) {
     if (PLAN_COLORS[plan]) return PLAN_COLORS[plan];
@@ -1552,8 +1808,7 @@ function lakhCell(bucket, category, extraClass, showAccounts) {
 
     return '<td class="' + classes + '"' + dataAttr + '>' +
         '<span class="big">' + amount.toFixed(2) + ' L</span>' +
-        '<span class="small">' + (showAccounts
-            ? accountCount + (accountCount === 1 ? ' account' : ' accounts')
+        '<span class="small">' + (showAccounts ? accountsLabel(accountCount)
             : count + (count === 1 ? ' deal' : ' deals')) + '</span></td>';
 }
 
@@ -1582,6 +1837,8 @@ function renderExpectedBusiness(m, live) {
         grandPipeline.count += m.pipelineByQuarter[q].count;
     });
 
+    var pipelineAccountCount = Object.keys(m.pipelineTableAccounts).length;
+
     var html = '<div class="eb-summary">';
 
     html += '<div class="eb-tile" style="border-left-color:#1457b8;"><span class="label">Expected Business</span>' +
@@ -1590,7 +1847,7 @@ function renderExpectedBusiness(m, live) {
 
     html += '<div class="eb-tile" style="border-left-color:#d97706;"><span class="label">Current Pipeline</span>' +
         '<span class="value">' + formatLakh(grandPipeline.amount_lakh) + '</span>' +
-        '<span class="sub">' + accountsLabel(Object.keys(m.pipelineTableAccounts).length) + '</span></div>';
+        '<span class="sub">' + accountsLabel(pipelineAccountCount) + '</span></div>';
 
     m.plans.forEach(function(plan, i) {
         var total = m.planTotals[plan];
@@ -1603,8 +1860,7 @@ function renderExpectedBusiness(m, live) {
 
     html += '</div>';
 
-    html += '<div class="table-scroll"><table class="eb-table"><thead><tr>';
-    html += '<th style="text-align:left;">Quarter</th>';
+    html += '<div class="table-scroll"><table class="eb-table"><thead><tr><th style="text-align:left;">Quarter</th>';
     m.plans.forEach(function(plan, i) {
         html += '<th><span class="plan-dot" style="background:' + planColor(plan, i) + ';"></span>' + escapeHtml(plan) + '</th>';
     });
@@ -1644,12 +1900,11 @@ function renderExpectedBusiness(m, live) {
         html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
         m.plans.forEach(function(plan) { html += '<td>' + formatLakh(m.planTotals[plan].amount_lakh) + '</td>'; });
         html += '<td>' + formatLakh(grandExpected.amount_lakh) + '</td>';
-        html += '<td>' + formatLakh(grandPipeline.amount_lakh) + ' (' + accountsLabel(Object.keys(m.pipelineTableAccounts).length) + ')</td>';
+        html += '<td>' + formatLakh(grandPipeline.amount_lakh) + ' (' + accountsLabel(pipelineAccountCount) + ')</td>';
         html += '<td class="mix-col"></td></tr>';
     }
 
-    html += '</tbody></table></div>';
-    html += notes;
+    html += '</tbody></table></div>' + notes;
 
     wrap.innerHTML = html;
 }
@@ -1658,44 +1913,48 @@ function renderExpectedBusiness(m, live) {
 function dataSourceNotes(m, live) {
 
     var f = fieldInfo;
-    var html = '<div class="data-source">' + live.deals.length + ' deals loaded; ' + m.periodDeals +
-        ' match the selected filters. Amount: ' + escapeHtml(f.amount.label) + ' (' + escapeHtml(f.amount.api) +
-        ', read as ' + amountUnitInUse + '). Plan: ' + escapeHtml(f.plan.label) + ' (' + escapeHtml(f.plan.api) +
-        '). Product: ' + escapeHtml(f.product.label) + ' (' + escapeHtml(f.product.api) +
-        '). Year: ' + escapeHtml(f.year.label) + ' (' + escapeHtml(f.year.api) + '). Quarter: ' +
-        escapeHtml(f.closingDate) + '. Gist account owner: ' + escapeHtml(f.gist.label) + ' (' +
-        escapeHtml(f.gist.api) + ').</div>';
+
+    var html = '<div class="data-source">' + live.deals.length + ' deals loaded, ' + live.fyDealCount +
+        ' with Deal Year ' + FY_FILTER + ' and Deal Type ' + escapeHtml(DEAL_TYPE_VALUES.join(" / ")) +
+        '. Knimbus Default and Renewal Notice stages are left out of these tables. Fields used: Amount = ' +
+        escapeHtml(f.amount.label) + ' (' + escapeHtml(f.amount.api) + ', read as ' + amountUnitInUse +
+        '), Plan = ' + escapeHtml(f.plan.label) + ' (' + escapeHtml(f.plan.api) +
+        '), Product = ' + escapeHtml(f.product.label) + ' (' + escapeHtml(f.product.api) +
+        '), Deal Type = ' + escapeHtml(f.dealType.label) + ' (' + escapeHtml(f.dealType.api) +
+        '), Year = ' + escapeHtml(f.year.label) + ' (' + escapeHtml(f.year.api) +
+        '), Gist Account Owner = ' + escapeHtml(f.gist.label) + ' (' + escapeHtml(f.gist.api) + ').</div>';
 
     var warnings = [];
 
-    if (live.deals.length > 0 && live.fyDealCount === 0) {
-        warnings.push('No deal has Deal Year ' + FY_FILTER + '. Set <code>DEAL_FIELDS.year</code> at the top of ' +
-            'the widget to your Deal Year field\'s API name.');
+    if (!f.dealType.found) {
+        warnings.push('No Deal Type field with the value "New" was found, so deals are NOT filtered by Deal Type. ' +
+            'Set <code>DEAL_FIELDS.dealType</code> to its API name, or check <code>DEAL_TYPE_VALUES</code>.');
+    } else if (live.yearDealCount > 0 && live.fyDealCount === 0) {
+        warnings.push('No ' + FY_FILTER + ' deal has Deal Type ' + escapeHtml(DEAL_TYPE_VALUES.join(" / ")) +
+            '. Check the exact picklist value and update <code>DEAL_TYPE_VALUES</code>.');
+    }
+    if (live.deals.length > 0 && live.yearDealCount === 0) {
+        warnings.push('No deal has Deal Year ' + FY_FILTER + '. Set <code>DEAL_FIELDS.year</code> to your Deal Year API name.');
     }
     if (REQUIRE_CLOSING_DATE_IN_FY && live.outsideWindow > 0) {
-        warnings.push(live.outsideWindow + ' deals have Deal Year ' + FY_FILTER + ' but a Closing Date outside ' +
-            '1 Apr ' + FY_START_YEAR + ' - 31 Mar ' + (FY_START_YEAR + 1) + '. They are counted in the top cards ' +
-            'but not in this table or the stage funnel. Correct their Closing Date in Zoho to include them here.');
+        warnings.push(live.outsideWindow + ' deals have Deal Year ' + FY_FILTER + ' but a Closing Date outside 1 Apr ' +
+            FY_START_YEAR + ' - 31 Mar ' + (FY_START_YEAR + 1) + '. They are counted in the top cards but not in these ' +
+            'tables or the funnel.');
     }
     if (!/expected ?business/i.test(f.amount.label + " " + f.amount.api.replace(/_/g, " "))) {
-        warnings.push('No field named "Expected Business" was found on Deals, so amounts use "' +
-            escapeHtml(f.amount.label) + '". Set <code>DEAL_FIELDS.amount</code> to the Expected Business API name.');
+        warnings.push('No "Expected Business" field was found on Deals, so amounts use "' + escapeHtml(f.amount.label) +
+            '". Set <code>DEAL_FIELDS.amount</code> to the Expected Business API name.');
     }
     if (!f.product.found) {
-        warnings.push('No Product field was found on Deals, so Current Pipeline cannot leave out ' +
-            escapeHtml(PIPELINE_EXCLUDED_PRODUCTS.join(", ")) + '. Set <code>DEAL_FIELDS.product</code> to its API name.');
+        warnings.push('No Product field was found, so Knimbus Default deals cannot be left out. Set ' +
+            '<code>DEAL_FIELDS.product</code> to its API name.');
     }
-    if (m.periodDeals > 0 && m.dealsWithAmount === 0) {
-        warnings.push('Every deal amount is 0 in the field "' + escapeHtml(f.amount.label) + '". Set ' +
-            '<code>DEAL_FIELDS.amount</code> to the API name of the field that holds expected business.');
+    if (m.chartDeals > 0 && m.dealsWithAmount === 0) {
+        warnings.push('Every Expected Business amount is 0 for these filters.');
     }
-    if (m.periodDeals > 0 && m.dealsWithPlan === 0) {
-        warnings.push('No deal has a value in the field "' + escapeHtml(f.plan.label) + '". Set ' +
-            '<code>DEAL_FIELDS.plan</code> to the API name of your Plan field.');
-    }
-    if (live.gistHqAccountCount > 0 && live.gistValues.length === 0) {
-        warnings.push('No Gist Account Owner values were found on ' + GIST_HQ_OWNER_NAME + ' accounts. Set ' +
-            '<code>ACCOUNT_GIST_FIELD</code> to the API name of that Accounts field.');
+    if (m.chartDeals > 0 && m.dealsWithPlan === 0) {
+        warnings.push('No deal has a value in "' + escapeHtml(f.plan.label) + '". Set <code>DEAL_FIELDS.plan</code> ' +
+            'to the API name of your Plan field.');
     }
 
     warnings.forEach(function(w) { html += '<div class="warn-note">' + w + '</div>'; });
@@ -1704,10 +1963,84 @@ function dataSourceNotes(m, live) {
 }
 
 
-function stageColor(stage, index) {
-    if (stage === CLOSED_LOST_STAGE) return "#dc2626";
-    if (PAYMENT_RECEIVED_STAGES.indexOf(stage) !== -1 || stage === "Closed Won") return "#059669";
-    if (PAYMENT_PENDING_STAGES.indexOf(stage) !== -1) return "#10b981";
+/* ---- Stage x Quarter ---- */
+
+function groupSubLabel(group, m) {
+    var def = STAGE_GROUPS.filter(function(g) { return g.name === group; })[0];
+    var seen = Object.keys((m.groupStages || {})[group] || {});
+    if (def && def.stages.length > 1) return def.stages.join(", ");
+    if (!def) return "Not in a stage group";
+    return seen.length > 1 ? seen.join(", ") : "";
+}
+
+
+function renderStageQuarterTable(m) {
+
+    var wrap = document.getElementById("stageQuarterWrap");
+    if (!wrap) return;
+
+    if (!m.groups.length) {
+        wrap.innerHTML = '<div class="loading">No deals for the selected filters.</div>';
+        return;
+    }
+
+    var html = '<div class="table-scroll"><table class="eb-table"><thead><tr><th style="text-align:left;">Stage</th>';
+    m.quarters.forEach(function(q) {
+        html += '<th>' + q + '<br><span style="font-weight:400;font-size:11px;">' + QUARTER_INFO[q].range + '</span></th>';
+    });
+    if (m.quarters.length > 1) html += '<th>Total</th>';
+    html += '</tr></thead><tbody>';
+
+    var colTotals = {};
+    m.quarters.forEach(function(q) { colTotals[q] = { amount_lakh: 0, count: 0 }; });
+    var grand = { amount_lakh: 0, count: 0 };
+
+    m.groups.forEach(function(group) {
+
+        var sub = groupSubLabel(group, m);
+        html += '<tr><td class="row-label">' + escapeHtml(group) +
+            (sub ? '<span class="sub">' + escapeHtml(sub) + '</span>' : '') + '</td>';
+
+        var rowTotal = { amount_lakh: 0, count: 0, accounts: {} };
+
+        m.quarters.forEach(function(q) {
+            var cell = (m.groupByQuarter[group] || {})[q];
+            html += lakhCell(cell, "sgq:" + encodeURIComponent(group) + ":" + q);
+            if (cell) {
+                rowTotal.amount_lakh += cell.amount_lakh;
+                rowTotal.count += cell.count;
+                colTotals[q].amount_lakh += cell.amount_lakh;
+                colTotals[q].count += cell.count;
+            }
+        });
+
+        if (m.quarters.length > 1) html += lakhCell(rowTotal, "sgq:" + encodeURIComponent(group) + ":ALL", "total-col");
+
+        grand.amount_lakh += rowTotal.amount_lakh;
+        grand.count += rowTotal.count;
+        html += '</tr>';
+    });
+
+    html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
+    m.quarters.forEach(function(q) {
+        html += '<td>' + formatLakh(colTotals[q].amount_lakh) + '<br><span style="font-weight:400;font-size:11px;">' +
+            colTotals[q].count + ' deals</span></td>';
+    });
+    if (m.quarters.length > 1) {
+        html += '<td>' + formatLakh(grand.amount_lakh) + '<br><span style="font-weight:400;font-size:11px;">' +
+            grand.count + ' deals</span></td>';
+    }
+    html += '</tr></tbody></table></div>';
+
+    wrap.innerHTML = html;
+}
+
+
+/* ---- Funnel ---- */
+
+function stageColor(group, index) {
+    if (group === "Closed Lost") return "#dc2626";
+    if (group === "Closed Won") return "#059669";
     var blues = ["#1f4e78", "#1d5fa8", "#2563eb", "#3b82f6", "#60a5fa"];
     return blues[index % blues.length];
 }
@@ -1718,45 +2051,41 @@ function renderStageFunnel(m) {
     var wrap = document.getElementById("stageFunnelWrap");
     if (!wrap) return;
 
-    var stages = STAGE_ORDER.filter(function(s) { return m.stageTotals[s] && m.stageTotals[s].count > 0; });
-    Object.keys(m.stageTotals).sort().forEach(function(s) {
-        if (stages.indexOf(s) === -1) stages.push(s);
-    });
+    var groups = m.groups;
 
-    if (stages.length === 0) {
+    if (groups.length === 0) {
         wrap.innerHTML = '<div class="loading">No deals for the selected filters.</div>';
         return;
     }
 
-    var maxAmount = Math.max.apply(null, stages.map(function(s) { return m.stageTotals[s].amount_lakh; }));
-    var maxCount = Math.max.apply(null, stages.map(function(s) { return m.stageTotals[s].count; }));
+    var maxAmount = Math.max.apply(null, groups.map(function(g) { return m.groupTotals[g].amount_lakh; }));
+    var maxCount = Math.max.apply(null, groups.map(function(g) { return m.groupTotals[g].count; }));
     var useAmount = maxAmount > 0;
 
     var totalAmount = 0;
     var totalCount = 0;
     var html = '<div class="funnel">';
 
-    stages.forEach(function(stage, i) {
+    groups.forEach(function(group, i) {
 
-        var t = m.stageTotals[stage];
+        var t = m.groupTotals[group];
         var ratio = useAmount ? t.amount_lakh / maxAmount : t.count / maxCount;
         var width = Math.max(3, Math.round(ratio * 100));
+        var sub = groupSubLabel(group, m);
 
         totalAmount += t.amount_lakh;
         totalCount += t.count;
 
-        html += '<div class="funnel-row clickable" data-cat="stage:' + escapeHtml(encodeURIComponent(stage)) + '" ' +
-            'title="Click to see accounts">' +
-            '<div class="funnel-stage">' + escapeHtml(stage) + '</div>' +
-            '<div class="funnel-track"><div class="funnel-bar" style="width:' + width + '%;background:' +
-            stageColor(stage, i) + ';"></div></div>' +
+        html += '<div class="funnel-row clickable" data-cat="stage:' + escapeHtml(encodeURIComponent(group)) + '" title="Click to see accounts">' +
+            '<div class="funnel-stage">' + escapeHtml(group) + (sub ? '<span class="sub">' + escapeHtml(sub) + '</span>' : '') + '</div>' +
+            '<div class="funnel-track"><div class="funnel-bar" style="width:' + width + '%;background:' + stageColor(group, i) + ';"></div></div>' +
             '<div class="funnel-value"><span class="big">' + formatLakh(t.amount_lakh) + '</span>' +
-            '<span class="small">' + t.count + (t.count === 1 ? ' deal' : ' deals') + '</span></div>' +
+            '<span class="small">' + t.count + (t.count === 1 ? ' deal' : ' deals') + ', ' +
+            accountsLabel(Object.keys(t.accounts).length) + '</span></div>' +
             '</div>';
     });
 
-    html += '</div>';
-    html += '<div class="funnel-total">All stages: <strong>' + formatLakh(totalAmount) + '</strong> across ' +
+    html += '</div><div class="funnel-total">All stages: <strong>' + formatLakh(totalAmount) + '</strong> across ' +
         totalCount + ' deals</div>';
 
     wrap.innerHTML = html;
@@ -1765,10 +2094,6 @@ function renderStageFunnel(m) {
 
 /* =========================================================
    ACCOUNT OWNER SUMMARY
-   Activity columns come from account_owner_report_reader (or are
-   calculated live when a Gist account owner is selected).
-   Closed Won / Closed Lost are calculated live from Deals so they
-   follow the quarter and Gist filters. They count accounts.
    ========================================================= */
 
 function loadAccountOwnerSummary() {
@@ -1796,6 +2121,58 @@ function loadAccountOwnerSummary() {
 }
 
 
+function updateAccountOwnerSummaryDisplay() {
+    if (!lastAccountOwnerSummaryData) return;
+    var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
+    renderAccountOwnerSummary(lastAccountOwnerSummaryData, selectedOwner);
+}
+
+
+function toggleGistBreakdown(event) {
+    if (event) event.stopPropagation();
+    aorGistExpanded = !aorGistExpanded;
+    updateAccountOwnerSummaryDisplay();
+    if (aorGistExpanded) ensureGistBreakdown();
+}
+
+
+function ensureGistBreakdown() {
+
+    if (!aorLive || aorLive.gistBreakdown || aorLive.gistBreakdownLoading) return;
+
+    var token = renderToken;
+    var state = aorLive;
+    state.gistBreakdownLoading = true;
+
+    loadLiveData().then(async function(live) {
+
+        var gistId = live.ownerIdByName[GIST_HQ_OWNER_NAME.toLowerCase()];
+        var gistSelection = currentGistSelection();
+        var names = live.gistValues.filter(function(v) {
+            return gistSelection === GIST_ACCOUNT_OWNER_DEFAULT || v === gistSelection;
+        });
+
+        var calls = gistId ? await getOwnerCalls(gistId) : [];
+        if (token !== renderToken || aorLive !== state) return;
+
+        state.gistBreakdown = names.map(function(name) {
+            var stats = computeAccountStats(gistId ? filterAccounts(live, gistId, name) : [], calls);
+            var wl = state.wonLost.gist[name] || { won: {}, lost: {} };
+            return { name: name, stats: stats, won: Object.keys(wl.won).length, lost: Object.keys(wl.lost).length };
+        });
+
+        state.gistBreakdownLoading = false;
+        updateAccountOwnerSummaryDisplay();
+
+    }).catch(function(err) {
+        console.error("Gist breakdown error:", err);
+        state.gistBreakdownLoading = false;
+        state.gistBreakdown = [];
+        updateAccountOwnerSummaryDisplay();
+    });
+}
+
+
 function renderAccountOwnerSummary(data, selectedOwner) {
 
     var container = document.getElementById("accountOwnerSummarySection");
@@ -1804,9 +2181,7 @@ function renderAccountOwnerSummary(data, selectedOwner) {
     var isFiltered = selectedOwner && selectedOwner !== "All Owners";
 
     var visibleOwners = isFiltered
-        ? allOwners.filter(function(o) {
-            return String(o.owner_name || "").trim().toLowerCase() === selectedOwner.trim().toLowerCase();
-        })
+        ? allOwners.filter(function(o) { return String(o.owner_name || "").trim().toLowerCase() === selectedOwner.trim().toLowerCase(); })
         : allOwners;
 
     if (isFiltered && visibleOwners.length === 0) {
@@ -1815,53 +2190,50 @@ function renderAccountOwnerSummary(data, selectedOwner) {
     }
 
     var PENDING = "…";
+    var keys = ["total_accounts", "last_30", "days_31_60", "days_60_plus", "touched", "non_touched", "closed_won", "closed_lost"];
+    var categories = ["aor:total", "aor:last_30", "aor:days_31_60", "aor:days_60_plus", "aor:touched", "aor:non_touched", "aor:closed_won", "aor:closed_lost"];
 
-    function cell(count, ownerId, category) {
+    function cell(count, ownerId, ownerName, category, gistName) {
         if (count === PENDING) return '<td>' + PENDING + '</td>';
         count = count || 0;
         if (count > 0) {
-            return '<td class="clickable plain" data-owner-id="' + escapeHtml(ownerId || "") + '" data-cat="' +
-                escapeHtml(category) + '">' + count + '</td>';
+            return '<td class="clickable plain" data-owner-id="' + escapeHtml(ownerId || "") + '" data-owner-name="' +
+                escapeHtml(ownerName) + '" data-cat="' + escapeHtml(category) + '"' +
+                (gistName ? ' data-gist="' + escapeHtml(gistName) + '"' : '') + '>' + count + '</td>';
         }
         return '<td>' + count + '</td>';
     }
 
     var html = '<div class="table-scroll"><table><thead><tr>';
     html += '<th style="text-align:left;">Account Owner</th><th>Total</th><th>Last 30</th>';
-    html += '<th>31-60</th><th>60+</th><th>Touched</th><th>Non-Touched</th>';
-    html += '<th>Closed Won</th><th>Closed Lost</th>';
+    html += '<th>31-60</th><th>60+</th><th>Touched</th><th>Non-Touched</th><th>Closed Won</th><th>Closed Lost</th>';
     html += '</tr></thead><tbody>';
 
-    var keys = ["total_accounts", "last_30", "days_31_60", "days_60_plus", "touched", "non_touched", "closed_won", "closed_lost"];
     var grand = {};
     keys.forEach(function(k) { grand[k] = 0; });
-    var grandPending = false;
+    var wonLostPending = !aorLive;
 
     visibleOwners.forEach(function(owner) {
 
-        var ownerKey = String(owner.owner_name || "").trim().toLowerCase();
+        var ownerName = String(owner.owner_name || "");
+        var ownerKey = ownerName.trim().toLowerCase();
+        var isGist = isGistHqName(ownerName);
+
         var row = {
-            total_accounts: owner.total_accounts,
-            last_30: owner.last_30,
-            days_31_60: owner.days_31_60,
-            days_60_plus: owner.days_60_plus,
-            touched: owner.touched,
-            non_touched: owner.non_touched
+            total_accounts: owner.total_accounts, last_30: owner.last_30, days_31_60: owner.days_31_60,
+            days_60_plus: owner.days_60_plus, touched: owner.touched, non_touched: owner.non_touched
         };
 
-        if (aorLive && aorLive.gistActive && isGistHqName(owner.owner_name)) {
+        if (aorLive && aorLive.gistActive && isGist) {
             var s = aorLive.gistStats;
-            row = s ? {
-                total_accounts: s.total, last_30: s.last_30, days_31_60: s.days_31_60,
-                days_60_plus: s.days_60_plus, touched: s.touched, non_touched: s.untouched
-            } : {
-                total_accounts: PENDING, last_30: PENDING, days_31_60: PENDING,
-                days_60_plus: PENDING, touched: PENDING, non_touched: PENDING
-            };
+            row = s ? { total_accounts: s.total, last_30: s.last_30, days_31_60: s.days_31_60,
+                        days_60_plus: s.days_60_plus, touched: s.touched, non_touched: s.untouched }
+                    : { total_accounts: PENDING, last_30: PENDING, days_31_60: PENDING,
+                        days_60_plus: PENDING, touched: PENDING, non_touched: PENDING };
         }
 
         if (aorLive) {
-            var wl = aorLive.wonLost[ownerKey] || { won: {}, lost: {} };
+            var wl = aorLive.wonLost.owners[ownerKey] || { won: {}, lost: {} };
             row.closed_won = Object.keys(wl.won).length;
             row.closed_lost = Object.keys(wl.lost).length;
         } else {
@@ -1869,41 +2241,55 @@ function renderAccountOwnerSummary(data, selectedOwner) {
             row.closed_lost = PENDING;
         }
 
-        html += '<tr><td class="row-label">' + escapeHtml(owner.owner_name) + '</td>';
-        html += cell(row.total_accounts, owner.owner_id, "aor:total");
-        html += cell(row.last_30, owner.owner_id, "aor:last_30");
-        html += cell(row.days_31_60, owner.owner_id, "aor:days_31_60");
-        html += cell(row.days_60_plus, owner.owner_id, "aor:days_60_plus");
-        html += cell(row.touched, owner.owner_id, "aor:touched");
-        html += cell(row.non_touched, owner.owner_id, "aor:non_touched");
-        html += cell(row.closed_won, owner.owner_id, "aor:closed_won");
-        html += cell(row.closed_lost, owner.owner_id, "aor:closed_lost");
+        html += '<tr><td class="row-label">' + escapeHtml(ownerName) +
+            (isGist ? '<button class="expand-btn" onclick="toggleGistBreakdown(event)">' +
+                (aorGistExpanded ? "Hide Gist account owners" : "Show Gist account owners") + '</button>' : '') + '</td>';
+        keys.forEach(function(k, i) { html += cell(row[k], owner.owner_id, ownerName, categories[i]); });
         html += '</tr>';
 
-        keys.forEach(function(k) {
-            if (row[k] === PENDING) grandPending = true;
-            else grand[k] += Number(row[k] || 0);
-        });
+        keys.forEach(function(k) { if (row[k] !== PENDING) grand[k] += Number(row[k] || 0); });
+
+        if (isGist && aorGistExpanded) {
+            if (!aorLive || !aorLive.gistBreakdown) {
+                html += '<tr class="sub-row"><td class="row-label" colspan="9">Calculating Gist account owners...</td></tr>';
+            } else if (aorLive.gistBreakdown.length === 0) {
+                html += '<tr class="sub-row"><td class="row-label" colspan="9">No Gist Account Owner values found.</td></tr>';
+            } else {
+                aorLive.gistBreakdown.forEach(function(g) {
+                    var subRow = {
+                        total_accounts: g.stats.total, last_30: g.stats.last_30, days_31_60: g.stats.days_31_60,
+                        days_60_plus: g.stats.days_60_plus, touched: g.stats.touched, non_touched: g.stats.untouched,
+                        closed_won: g.won, closed_lost: g.lost
+                    };
+                    html += '<tr class="sub-row"><td class="row-label">' + escapeHtml(g.name) + '</td>';
+                    keys.forEach(function(k, i) {
+                        html += cell(subRow[k], owner.owner_id, ownerName + " / " + g.name, categories[i], g.name);
+                    });
+                    html += '</tr>';
+                });
+            }
+        }
     });
 
     if (!isFiltered) {
         html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
         keys.forEach(function(k) {
-            var pendingCol = grandPending && (k === "closed_won" || k === "closed_lost") && !aorLive;
-            html += '<td>' + (pendingCol ? PENDING : grand[k]) + '</td>';
+            var pending = wonLostPending && (k === "closed_won" || k === "closed_lost");
+            html += '<td>' + (pending ? PENDING : grand[k]) + '</td>';
         });
         html += '</tr>';
     }
 
     html += '</tbody></table></div>';
+    html += '<div class="data-source">Closed Won and Closed Lost count accounts with a Deal Type New deal in that stage group, ' +
+        'Closing Date in the selected period.</div>';
 
     container.innerHTML = html;
 
     container.querySelectorAll(".clickable").forEach(function(el) {
         el.onclick = function() {
-            var row = el.closest("tr");
-            var ownerName = row ? row.querySelector("td.row-label").innerText : "";
-            openDrilldown(el.getAttribute("data-owner-id") || null, ownerName, el.getAttribute("data-cat"));
+            openDrilldown(el.getAttribute("data-owner-id") || null, el.getAttribute("data-owner-name") || "",
+                el.getAttribute("data-cat"), el.getAttribute("data-gist"));
         };
     });
 }
@@ -1928,9 +2314,7 @@ function zohoSearchAll(module, criteria) {
 
             searchPromise
                 .then(function(response) {
-
                     if (response && response.data) allRecords = allRecords.concat(response.data);
-
                     if (response && response.info && response.info.more_records === true && page < 150) {
                         page++;
                         fetchPage();
@@ -1986,7 +2370,7 @@ function attachDrilldownHandlers(ownerId, ownerName) {
     document.querySelectorAll("#content .clickable").forEach(function(el) {
         el.onclick = function() {
             var category = el.getAttribute("data-cat");
-            if (category) openDrilldown(ownerId || null, ownerName, category);
+            if (category) openDrilldown(ownerId || null, ownerName, category, null);
         };
     });
 }
@@ -2020,22 +2404,29 @@ function categoryLabel(category) {
     if (parts[0] === "qp") return decodeURIComponent(parts[1]) + " " + decodeURIComponent(parts[2]) + " Expected Business";
     if (parts[0] === "quarter_pipeline") return decodeURIComponent(parts[1]) + " Current Pipeline";
     if (parts[0] === "stage") return decodeURIComponent(parts[1]);
+    if (parts[0] === "sgq") return decodeURIComponent(parts[1]) + (parts[2] === "ALL" ? "" : ", " + parts[2]);
+    if (parts[0] === "team") {
+        var row = SALES_TEAM_TARGETS[Number(parts[1])] || { team: "Team" };
+        var period = parts[2] === "FY" ? FY_LONG_LABEL : parts[2];
+        return row.team + ", " + period + (parts[3] === "pipelineA" ? " Pipeline (Plan A)" : " Achieved");
+    }
 
     return category;
 }
 
 
-function openDrilldown(ownerId, ownerName, category) {
+function openDrilldown(ownerId, ownerName, category, gistOverride) {
 
     var modal = document.getElementById("drilldownModal");
     var title = document.getElementById("drilldownTitle");
     var body = document.getElementById("drilldownBody");
 
-    title.innerText = (ownerName || "All Owners") + " - " + categoryLabel(category);
+    var isTeam = category.indexOf("team:") === 0;
+    title.innerText = (isTeam ? "" : (ownerName || "All Owners") + " - ") + categoryLabel(category);
     body.innerHTML = "Loading...";
     modal.classList.add("open");
 
-    runDrilldown(ownerId, ownerName, category)
+    runDrilldown(ownerId, ownerName, category, gistOverride)
 
         .then(function(names) {
 
@@ -2044,10 +2435,9 @@ function openDrilldown(ownerId, ownerName, category) {
                 return;
             }
 
-            var html = '<div class="modal-count">' + names.length + (names.length === 1 ? ' account' : ' accounts') + '</div><ul>';
+            var html = '<div class="modal-count">' + accountsLabel(names.length) + '</div><ul>';
             names.forEach(function(name) { html += "<li>" + escapeHtml(name) + "</li>"; });
-            html += "</ul>";
-            body.innerHTML = html;
+            body.innerHTML = html + "</ul>";
         })
 
         .catch(function(err) {
@@ -2079,12 +2469,13 @@ var AOR_CATEGORY_MAP = {
 };
 
 
-async function runDrilldown(ownerId, ownerName, category) {
+async function runDrilldown(ownerId, ownerName, category, gistOverride) {
 
     var live = await loadLiveData();
 
-    if (!ownerId && ownerName && ownerName !== "All Owners") {
-        ownerId = live.ownerIdByName[ownerName.trim().toLowerCase()] || "__no_owner__";
+    var baseOwnerName = String(ownerName || "").split(" / ")[0];
+    if (!ownerId && baseOwnerName && baseOwnerName !== "All Owners") {
+        ownerId = live.ownerIdByName[baseOwnerName.trim().toLowerCase()] || "__no_owner__";
     }
 
     if (AOR_CATEGORY_MAP[category]) category = AOR_CATEGORY_MAP[category];
@@ -2092,17 +2483,38 @@ async function runDrilldown(ownerId, ownerName, category) {
     var parts = category.split(":");
     var kind = parts[0];
     var selectedQuarter = currentQuarterSelection();
-    var gistSelection = currentGistSelection();
+    var gistSelection = gistOverride || currentGistSelection();
+    var unique = {};
 
-    var dealKinds = ["qp", "quarter_pipeline", "stage", "won_accounts", "lost_accounts"];
+    // ---- Team table ----
+    if (kind === "team") {
+
+        var teamIndex = Number(parts[1]);
+        var period = parts[2];
+
+        live.deals.forEach(function(deal) {
+            var ctx = dealContext(deal, live, ALL_QUARTERS, GIST_ACCOUNT_OWNER_DEFAULT, false);
+            if (!ctx || !ctx.account || !ctx.quarter || !chartEligible(ctx)) return;
+            if (ctx.account.teamIndex !== teamIndex) return;
+            if (period !== "FY" && ctx.quarter !== period) return;
+            var ok = parts[3] === "pipelineA"
+                ? isPipelineDeal(ctx) && ctx.plan.trim().toLowerCase() === "plan a"
+                : isClosedWonStage(ctx.stage) && !ctx.excluded;
+            if (ok) unique[ctx.accId] = ctx.accName;
+        });
+
+        return sortNames(Object.values(unique));
+    }
+
+    // ---- Deal-based: cards, charts, summary won/lost ----
+    var dealKinds = ["qp", "quarter_pipeline", "stage", "sgq", "won_accounts", "lost_accounts"];
 
     if (CARD_CATEGORIES.indexOf(category) !== -1 || dealKinds.indexOf(kind) !== -1) {
 
-        var unique = {};
+        var isCard = CARD_CATEGORIES.indexOf(category) !== -1;
 
         live.deals.forEach(function(deal) {
 
-            var isCard = CARD_CATEGORIES.indexOf(category) !== -1;
             var ctx = dealContext(deal, live, selectedQuarter, gistSelection, isCard);
             if (!ctx) return;
 
@@ -2111,17 +2523,21 @@ async function runDrilldown(ownerId, ownerName, category) {
             if (isCard) {
                 ok = matchesCardCategory(ctx, category, ownerId);
             } else if (matchesAccountOwner(ctx, ownerId)) {
-                if (kind === "qp") {
-                    ok = ctx.quarter === decodeURIComponent(parts[1]) &&
-                        ctx.plan === decodeURIComponent(parts[2]) && countsAsExpected(ctx);
-                } else if (kind === "quarter_pipeline") {
-                    ok = ctx.quarter === decodeURIComponent(parts[1]) && isPipelineDeal(ctx);
-                } else if (kind === "stage") {
-                    ok = ctx.stage === decodeURIComponent(parts[1]);
-                } else if (kind === "won_accounts") {
+                if (kind === "won_accounts") {
                     ok = isClosedWonStage(ctx.stage) && !ctx.excluded;
                 } else if (kind === "lost_accounts") {
-                    ok = ctx.stage === CLOSED_LOST_STAGE;
+                    ok = isClosedLostStage(ctx.stage);
+                } else if (chartEligible(ctx)) {
+                    if (kind === "qp") {
+                        ok = ctx.quarter === decodeURIComponent(parts[1]) && ctx.plan === decodeURIComponent(parts[2]) && countsAsExpected(ctx);
+                    } else if (kind === "quarter_pipeline") {
+                        ok = ctx.quarter === decodeURIComponent(parts[1]) && isPipelineDeal(ctx);
+                    } else if (kind === "stage") {
+                        ok = stageGroupOf(ctx.stage) === decodeURIComponent(parts[1]);
+                    } else if (kind === "sgq") {
+                        ok = stageGroupOf(ctx.stage) === decodeURIComponent(parts[1]) && !!ctx.quarter &&
+                            (parts[2] === "ALL" || ctx.quarter === parts[2]);
+                    }
                 }
             }
 
@@ -2131,11 +2547,10 @@ async function runDrilldown(ownerId, ownerName, category) {
         return sortNames(Object.values(unique));
     }
 
+    // ---- Account-based ----
     var accounts = filterAccounts(live, ownerId, gistSelection);
 
-    if (category === "total_accounts") {
-        return sortNames(accounts.map(function(a) { return a.name; }));
-    }
+    if (category === "total_accounts") return sortNames(accounts.map(function(a) { return a.name; }));
 
     var calls = await getOwnerCalls(ownerId);
     var latest = latestOwnerCalls(accounts, calls);
@@ -2147,18 +2562,13 @@ async function runDrilldown(ownerId, ownerName, category) {
         var age = lastCall ? agingOf(lastCall) : null;
         var isMatch = false;
 
-        if (category === "untouched") {
-            isMatch = !lastCall;
-        } else if (category === "touched") {
-            isMatch = !!lastCall;
-        } else if (kind === "aging") {
-            isMatch = age === parts[1];
-        } else if (kind === "bucket") {
-            if (account.bucket === decodeURIComponent(parts[1])) {
-                if (parts[2] === "Total") isMatch = true;
-                else if (parts[2] === "non_touched") isMatch = !lastCall;
-                else isMatch = age === parts[2];
-            }
+        if (category === "untouched") isMatch = !lastCall;
+        else if (category === "touched") isMatch = !!lastCall;
+        else if (kind === "aging") isMatch = age === parts[1];
+        else if (kind === "bucket" && account.bucket === decodeURIComponent(parts[1])) {
+            if (parts[2] === "Total") isMatch = true;
+            else if (parts[2] === "non_touched") isMatch = !lastCall;
+            else isMatch = age === parts[2];
         }
 
         if (isMatch) matches.push(account.name);
