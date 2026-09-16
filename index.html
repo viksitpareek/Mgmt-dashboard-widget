@@ -242,7 +242,7 @@ var ACCOUNT_GIST_FIELD = "";   // Accounts: "Gist Account Owner"
 
 var AMOUNT_UNIT = "auto";      // "rupees", "lakh" or "auto"
 
-/* Knimbus Default is left out ONLY of the Current Pipeline card at the top */
+/* Knimbus Default is left out of: the Current Pipeline card, Quarter x Plan, and the Stage-wise funnel */
 var EXCLUDED_PRODUCTS = ["Knimbus Default"];
 var PIPELINE_OPEN_STAGES_ONLY = true;
 var PIPELINE_REQUIRE_SAME_OWNER = true;   // Current Pipeline card: deal owner must own the account
@@ -1101,9 +1101,10 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 }
 
 
-/* Charts: Expected Order Date in FY, no removed stages */
+/* Quarter x Plan and Stage-wise funnel: Expected Order Date in FY, no Knimbus Default, no removed stages */
 function chartEligible(ctx) {
     if (REQUIRE_CLOSING_DATE_IN_FY && !ctx.inWindow) return false;
+    if (hasExcludedProduct(ctx)) return false;
     return stageGroupOf(ctx.stage) !== null;
 }
 
@@ -2020,7 +2021,7 @@ function dataSourceNotes(m, live, missingOwners) {
 
     var html = '<div class="data-source">' + live.deals.length + ' deals loaded, ' + live.fyDealCount +
         ' with Deal Year ' + FY_FILTER + ' and Deal Type ' + escapeHtml(DEAL_TYPE_VALUES.join(" / ")) +
-        '. Renewal Notice stages are left out. Knimbus Default is left out only of the Current Pipeline card at the top. Fields used: Amount = ' +
+        '. Renewal Notice stages are left out. Knimbus Default is left out of this table, the Stage-wise funnel and the Current Pipeline card. Fields used: Amount = ' +
         escapeHtml(f.amount.label) + ' (' + escapeHtml(f.amount.api) + ', read as ' + amountUnitInUse +
         '), Plan = ' + escapeHtml(f.plan.label) + ' (' + escapeHtml(f.plan.api) +
         '), Product = ' + escapeHtml(f.product.label) + ' (' + escapeHtml(f.product.api) +
@@ -2059,7 +2060,7 @@ function dataSourceNotes(m, live, missingOwners) {
             '". Set <code>DEAL_FIELDS.amount</code> to the Expected Business API name.');
     }
     if (!f.product.found) {
-        warnings.push('No Product field was found, so Knimbus Default deals cannot be left out of the Current Pipeline card. Set ' +
+        warnings.push('No Product field was found, so Knimbus Default deals cannot be left out. Set ' +
             '<code>DEAL_FIELDS.product</code> to its API name.');
     }
     if (m.chartDeals > 0 && m.dealsWithAmount === 0) warnings.push('Every Expected Business amount is 0 for these filters.');
