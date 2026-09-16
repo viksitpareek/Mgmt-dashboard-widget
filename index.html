@@ -242,7 +242,7 @@ var ACCOUNT_GIST_FIELD = "";   // Accounts: "Gist Account Owner"
 
 var AMOUNT_UNIT = "auto";      // "rupees", "lakh" or "auto"
 
-/* Knimbus Default is removed from Current Pipeline, both charts and the target table */
+/* Knimbus Default is left out ONLY of the Current Pipeline card at the top */
 var EXCLUDED_PRODUCTS = ["Knimbus Default"];
 var PIPELINE_OPEN_STAGES_ONLY = true;
 var PIPELINE_REQUIRE_SAME_OWNER = true;   // Current Pipeline card: deal owner must own the account
@@ -259,17 +259,22 @@ var GIST_HQ_OWNER_NAME = "GIST HQ";
 
 /* ---- Stages ---- */
 
+/* name = row shown in the funnel, stages = CRM stages merged into it, show = stages listed under the name */
 var STAGE_GROUPS = [
-    { name: "Qualification", stages: ["Qualification", "Lead"] },
+    { name: "Qualification - Lead", stages: ["Qualification - Lead", "Qualification", "Lead"] },
     { name: "Met and Interested", stages: ["Met and Interested"] },
     { name: "Demonstrated and Queries Handled", stages: ["Demonstrated and Queries Handled"] },
-    { name: "Proposal Sent", stages: ["Proposal Sent", "Budgetary Proposal"] },
+    { name: "Proposal Sent", stages: ["Proposal Sent", "Budgetary Proposal"],
+      show: ["Proposal Sent", "Budgetary Proposal"] },
     { name: "Negotiation & Review", stages: ["Negotiation/Review", "Negotiation & Review", "Negotiation and Review"] },
     { name: "Proforma Invoice Sent", stages: ["Proforma Invoice Sent"] },
     { name: "Invoice Sent", stages: ["Invoice Sent"] },
     { name: "Closed Won", stages: ["Email Confirmation", "PI Sent - Order Received", "Payment Received",
-                                   "Part Payment Received", "Short Payment", "Closed Won"] },
-    { name: "Closed Lost", stages: ["Closed Lost", "Approval for Close Lost"] }
+                                   "Part Payment Received", "Short Payment", "Order Booked", "Closed Won"],
+      show: ["Email Confirmation", "PI Sent - Order Received", "Payment Received", "Part Payment Received",
+             "Short Payment", "Order Booked"] },
+    { name: "Closed Lost", stages: ["Closed Lost", "Approval for Close Lost"],
+      show: ["Closed Lost", "Approval for Close Lost"] }
 ];
 
 /* Deals in these stages are left out of the dashboard */
@@ -1096,16 +1101,16 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 }
 
 
-/* Charts and target table: Expected Order Date in FY, no Knimbus Default, no removed stages */
+/* Charts: Expected Order Date in FY, no removed stages */
 function chartEligible(ctx) {
     if (REQUIRE_CLOSING_DATE_IN_FY && !ctx.inWindow) return false;
-    if (hasExcludedProduct(ctx)) return false;
     return stageGroupOf(ctx.stage) !== null;
 }
 
 
-function isPipelineDeal(ctx) {
-    if (hasExcludedProduct(ctx)) return false;
+/* Open pipeline deal. applyProductRule = true only for the Current Pipeline card */
+function isPipelineDeal(ctx, applyProductRule) {
+    if (applyProductRule && hasExcludedProduct(ctx)) return false;
     if (isRemovedStage(ctx.stage)) return false;
     if (PIPELINE_OPEN_STAGES_ONLY && !isOpenStage(ctx.stage)) return false;
     return true;
@@ -1140,8 +1145,8 @@ function cardStageMatch(ctx, category) {
     if (category === "achieved") return isClosedWonStage(ctx.stage) && !ctx.excluded;
     if (category === "payment_received") return PAYMENT_RECEIVED_KEYS.indexOf(normStage(ctx.stage)) !== -1 && !ctx.excluded;
     if (category === "payment_pending") return PAYMENT_PENDING_KEYS.indexOf(normStage(ctx.stage)) !== -1;
-    if (category === "current_pipeline") {
-        if (!isPipelineDeal(ctx)) return false;
+    if (category === "current_pipeline" || category === "current_pipeline_all_products") {
+        if (!isPipelineDeal(ctx, category === "current_pipeline")) return false;
         return !PIPELINE_REQUIRE_SAME_OWNER || (!!ctx.account && ctx.account.ownerId === ctx.dealOwnerId);
     }
     return false;
@@ -1304,7 +1309,7 @@ function computeTeamMetrics(live) {
             if (ctx.quarter) teams[index].achieved[ctx.quarter] += ctx.amount;
         }
 
-        if (ctx.quarter && cardStageMatch(ctx, "current_pipeline") && ctx.plan.trim().toLowerCase() === "plan a") {
+        if (ctx.quarter && cardStageMatch(ctx, "current_pipeline_all_products") && ctx.plan.trim().toLowerCase() === "plan a") {
             teams[index].pipelineA[ctx.quarter] += ctx.amount;
         }
     });
@@ -1313,7 +1318,7 @@ function computeTeamMetrics(live) {
 }
 
 
-/* Closed Won / Closed Lost accounts per owner and per Gist Account Owner (Deal Type New, no Knimbus Default) */
+/* Closed Won / Closed Lost accounts per owner and per Gist Account Owner (Deal Type New) */
 function computeWonLost(live, selectedQuarter, gistSelection) {
 
     var result = { owners: {}, gist: {} };
@@ -1326,7 +1331,7 @@ function computeWonLost(live, selectedQuarter, gistSelection) {
     live.deals.forEach(function(deal) {
 
         var ctx = dealContext(deal, live, selectedQuarter, gistSelection, false);
-        if (!ctx || !ctx.account || isRemovedStage(ctx.stage) || hasExcludedProduct(ctx)) return;
+        if (!ctx || !ctx.account || isRemovedStage(ctx.stage)) return;
 
         var isWon = isClosedWonStage(ctx.stage) && !ctx.excluded;
         var isLost = isClosedLostStage(ctx.stage);
@@ -2015,7 +2020,7 @@ function dataSourceNotes(m, live, missingOwners) {
 
     var html = '<div class="data-source">' + live.deals.length + ' deals loaded, ' + live.fyDealCount +
         ' with Deal Year ' + FY_FILTER + ' and Deal Type ' + escapeHtml(DEAL_TYPE_VALUES.join(" / ")) +
-        '. Knimbus Default and Renewal Notice stages are left out of these tables. Fields used: Amount = ' +
+        '. Renewal Notice stages are left out. Knimbus Default is left out only of the Current Pipeline card at the top. Fields used: Amount = ' +
         escapeHtml(f.amount.label) + ' (' + escapeHtml(f.amount.api) + ', read as ' + amountUnitInUse +
         '), Plan = ' + escapeHtml(f.plan.label) + ' (' + escapeHtml(f.plan.api) +
         '), Product = ' + escapeHtml(f.product.label) + ' (' + escapeHtml(f.product.api) +
@@ -2054,7 +2059,7 @@ function dataSourceNotes(m, live, missingOwners) {
             '". Set <code>DEAL_FIELDS.amount</code> to the Expected Business API name.');
     }
     if (!f.product.found) {
-        warnings.push('No Product field was found, so Knimbus Default deals cannot be left out. Set ' +
+        warnings.push('No Product field was found, so Knimbus Default deals cannot be left out of the Current Pipeline card. Set ' +
             '<code>DEAL_FIELDS.product</code> to its API name.');
     }
     if (m.chartDeals > 0 && m.dealsWithAmount === 0) warnings.push('Every Expected Business amount is 0 for these filters.');
@@ -2073,9 +2078,7 @@ function dataSourceNotes(m, live, missingOwners) {
 
 function groupSubLabel(group) {
     var def = STAGE_GROUPS.filter(function(g) { return g.name === group; })[0];
-    if (!def) return "";
-    var names = def.stages.filter(function(st) { return st !== def.name; });
-    return names.length ? names.join(", ") : "";
+    return def && def.show ? def.show.join(", ") : "";
 }
 
 
@@ -2482,7 +2485,7 @@ async function runDrilldown(scope, category) {
             if (!ctx || teamIndexForDeal(ctx) !== teamIndex) return;
             if (period !== "FY" && ctx.quarter !== period) return;
             var ok = parts[3] === "pipelineA"
-                ? cardStageMatch(ctx, "current_pipeline") && ctx.plan.trim().toLowerCase() === "plan a"
+                ? cardStageMatch(ctx, "current_pipeline_all_products") && ctx.plan.trim().toLowerCase() === "plan a"
                 : cardStageMatch(ctx, "achieved");
             if (ok) unique[ctx.accId] = ctx.accName;
         });
@@ -2508,9 +2511,9 @@ async function runDrilldown(scope, category) {
                 ok = matchesCardCategory(ctx, category, ownerSet);
             } else if (matchesAccountOwner(ctx, ownerSet)) {
                 if (kind === "won_accounts") {
-                    ok = !isRemovedStage(ctx.stage) && !hasExcludedProduct(ctx) && isClosedWonStage(ctx.stage) && !ctx.excluded;
+                    ok = !isRemovedStage(ctx.stage) && isClosedWonStage(ctx.stage) && !ctx.excluded;
                 } else if (kind === "lost_accounts") {
-                    ok = !hasExcludedProduct(ctx) && isClosedLostStage(ctx.stage);
+                    ok = isClosedLostStage(ctx.stage);
                 } else if (chartEligible(ctx)) {
                     if (kind === "qp") {
                         ok = ctx.quarter === decodeURIComponent(parts[1]) && ctx.plan === decodeURIComponent(parts[2]) && countsAsExpected(ctx);
