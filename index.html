@@ -219,7 +219,7 @@
 var FY_START_YEAR = 2026;
 var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2) value
 
-/* Tables, funnel and summary need a Closing Date inside the FY. The top amount cards don't. */
+/* Tables, funnel and summary need an Expected Closing Date inside the FY. The top amount cards don't. */
 var REQUIRE_CLOSING_DATE_IN_FY = true;
 
 /* Only deals with one of these Deal Type values are used anywhere on the dashboard */
@@ -236,7 +236,7 @@ var DEAL_FIELDS = {
     year: "",          // Year2
     product: "",       // a field labelled "Product"
     dealType: "",      // Type / a field labelled "Deal Type"
-    closingDate: "Closing_Date"
+    closingDate: ""    // "Expected Closing Date" (auto)
 };
 var ACCOUNT_GIST_FIELD = "";   // Accounts: "Gist Account Owner"
 
@@ -253,8 +253,7 @@ var ALLOWED_ACCOUNT_OWNERS = ["Anurag Mishra", "Tejal Pandya", "Ashish Kumar", "
 
 /*
  * Accounts are counted (Total / Touched / Untouched, bucket table, summary)
- * only if they have at least one deal with Deal Type New whose Product
- * isn't Knimbus Default.
+ * only if they have at least one deal with Deal Type New (any Product).
  */
 var GIST_HQ_OWNER_NAME = "GIST HQ";
 
@@ -755,6 +754,20 @@ function valueIsNewDealType(value) {
 }
 
 
+function chooseClosingDateField(options, deals) {
+    if (DEAL_FIELDS.closingDate) return describeField(DEAL_FIELDS.closingDate, options, true);
+    var picked = pickByTiers(options, [
+        function(o) { return /expected clos(ing|ure) date/.test(optionText(o)); },
+        function(o) { return /expected.*clos/.test(optionText(o)); }
+    ], function(api) { return countNonEmpty(deals, api); });
+    if (picked) return picked;
+    for (var i = 0; i < options.length; i++) {
+        if (/expected.*clos/.test(optionText(options[i]))) return { api: options[i].api, label: options[i].label, found: true };
+    }
+    return describeField("Closing_Date", options, false);
+}
+
+
 function chooseYearField(options, deals) {
     if (DEAL_FIELDS.year) return describeField(DEAL_FIELDS.year, options, true);
     return pickByTiers(options, [
@@ -833,7 +846,8 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
     var dealOptions = fieldOptions(dealMeta, deals);
     var accountOptions = fieldOptions(accountMeta, accounts);
 
-    fieldInfo = { closingDate: DEAL_FIELDS.closingDate || "Closing_Date" };
+    fieldInfo = {};
+    fieldInfo.closingDate = chooseClosingDateField(dealOptions, deals);
     fieldInfo.year = chooseYearField(dealOptions, deals);
     fieldInfo.dealType = chooseDealTypeField(dealOptions, deals);
 
@@ -852,7 +866,6 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
     var scopedAccountIds = {};
     deals.forEach(function(d) {
         if (!dealTypeOk(d)) return;
-        if (dealHasExcludedProduct(d)) return;
         var accId = ddLookupId(d.Account_Name);
         if (accId) scopedAccountIds[accId] = true;
     });
@@ -898,7 +911,7 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
     if (gistHasEmpty) gistValues.push(GIST_NOT_ASSIGNED);
 
     var outsideWindow = fyDeals.filter(function(d) {
-        return !isInFyWindow(ddParseDate(d[fieldInfo.closingDate]));
+        return !isInFyWindow(ddParseDate(d[fieldInfo.closingDate.api]));
     }).length;
 
     return {
@@ -976,7 +989,7 @@ function dealFiscalYear(deal) {
         return value;
     }
 
-    var date = ddParseDate(deal && deal[fieldInfo.closingDate]);
+    var date = ddParseDate(deal && deal[fieldInfo.closingDate.api]);
     if (!date) return "";
     var year = date.getFullYear();
     return (date.getMonth() >= 3) ? (year + "-" + (year + 1)) : ((year - 1) + "-" + year);
@@ -1045,7 +1058,7 @@ function accountMatchesGist(account, gistSelection) {
 /*
  * Every number on the dashboard starts here: Deal Year, Deal Type = New,
  * linked account, Gist filter and quarter.
- * cardMode = true skips the "Closing Date inside the FY" check (top cards).
+ * cardMode = true skips the "Expected Closing Date inside the FY" check (top cards).
  */
 function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 
@@ -1055,7 +1068,7 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
     var accId = ddLookupId(deal.Account_Name);
     if (!accId) return null;
 
-    var closingDate = ddParseDate(deal[fieldInfo.closingDate]);
+    var closingDate = ddParseDate(deal[fieldInfo.closingDate.api]);
     var inWindow = isInFyWindow(closingDate);
     if (!cardMode && REQUIRE_CLOSING_DATE_IN_FY && !inWindow) return null;
 
@@ -1083,7 +1096,7 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 }
 
 
-/* Charts and target table: Closing Date in FY, no Knimbus Default, no removed stages */
+/* Charts and target table: Expected Closing Date in FY, no Knimbus Default, no removed stages */
 function chartEligible(ctx) {
     if (REQUIRE_CLOSING_DATE_IN_FY && !ctx.inWindow) return false;
     if (hasExcludedProduct(ctx)) return false;
@@ -1228,7 +1241,7 @@ function computeDealMetrics(live, ownerSet, gistSelection, selectedQuarter) {
     found.sort().forEach(function(p) {
         if (m.plans.indexOf(p) === -1 && p !== "No Plan") m.plans.push(p);
     });
-    if (found.indexOf("No Plan") !== -1) m.plans.push("No Plan");
+    // Deals without a plan are not shown in Quarter x Plan
 
     m.groups = orderedGroups(Object.keys(m.groupTotals));
 
@@ -1505,14 +1518,14 @@ function renderAll() {
     html += '</div>';
 
     html += '<div class="card-row">';
-    html += cardHtml("Total Accounts", "Calculating...", "waiting", "total_accounts", "Deal Type New, excl. Knimbus Default");
+    html += cardHtml("Total Accounts", "Calculating...", "waiting", "total_accounts", "Accounts with a Deal Type New deal");
     html += cardHtml("Untouched Accounts", "Calculating...", "pending waiting", "untouched");
     html += cardHtml("Touched", "Calculating...", "achieved waiting", "touched");
     html += cardHtml("Current Pipeline", "Calculating...", "pending waiting", "current_pipeline");
     html += '</div>';
 
     html += '<div class="section"><h2>Bucket-wise Activity</h2>';
-    html += '<p class="section-note">Accounts with a Deal Type New deal (Knimbus Default left out). Activity is measured from today, so the quarter filter does not change it.</p>';
+    html += '<p class="section-note">Accounts with a Deal Type New deal. Activity is measured from today, so the quarter filter does not change it.</p>';
     html += '<div id="bucketWrap"><div class="loading">Calculating account activity...</div></div>';
     html += '</div>';
 
@@ -1795,7 +1808,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
             html += '<td>' + pctBadge(qa, qt) + '</td>';
         } else {
             html += teamAmountCell(fyAchieved, "team:" + idx + ":FY:achieved",
-                fyAchieved - inQuarters > 0.005 ? formatLakh(fyAchieved - inQuarters) + " has no Closing Date in the FY" : "");
+                fyAchieved - inQuarters > 0.005 ? formatLakh(fyAchieved - inQuarters) + " has no Expected Closing Date in the FY" : "");
             html += '<td>' + pctBadge(fyAchieved, teamFyTarget(row)) + '</td>';
             QUARTERS.forEach(function(q) {
                 var target = teamQuarterTarget(row, q);
@@ -1842,7 +1855,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
 
     html += '<div class="data-source">Achieved uses the same rules as the Achieved card: deal owner, Closed Won stages, ' +
         'Deal Type New, Deal Year ' + FY_FILTER + '. FY Achieved matches the card with All Quarters; each quarter uses the ' +
-        'deal\'s Closing Date. ' + GIST_HQ_OWNER_NAME + ' deals are split into teams by the account\'s Gist Account Owner.</div>';
+        'deal\'s Expected Closing Date. ' + GIST_HQ_OWNER_NAME + ' deals are split into teams by the account\'s Gist Account Owner.</div>';
 
     var unmatched = live.gistValues.filter(function(name) {
         if (name === GIST_NOT_ASSIGNED) return false;
@@ -1906,7 +1919,7 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
     var notes = dataSourceNotes(m, live, missingOwners);
 
     if (m.plans.length === 0) {
-        wrap.innerHTML = '<div class="loading">No expected business deals for the selected filters.</div>' + notes;
+        wrap.innerHTML = '<div class="loading">No expected business deals with a Plan for the selected filters.</div>' + notes;
         return;
     }
 
@@ -1917,21 +1930,14 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
     });
 
     var grandPipeline = { amount_lakh: 0, count: 0 };
-    var grandTarget = 0;
     m.quarters.forEach(function(q) {
         grandPipeline.amount_lakh += m.pipelineByQuarter[q].amount_lakh;
         grandPipeline.count += m.pipelineByQuarter[q].count;
-        grandTarget += targets[q];
     });
 
     var pipelineAccountCount = Object.keys(m.pipelineTableAccounts).length;
-    var periodName = m.quarters.length === 1 ? m.quarters[0] : FY_LONG_LABEL;
 
     var html = '<div class="eb-summary">';
-
-    html += '<div class="eb-tile" style="border-left-color:#7c3aed;"><span class="label">Target (' + periodName + ')</span>' +
-        '<span class="value">' + formatLakh(grandTarget) + '</span>' +
-        '<span class="sub">Expected business covers ' + (percentText(grandExpected.amount_lakh, grandTarget) || "—") + '</span></div>';
 
     html += '<div class="eb-tile" style="border-left-color:#1457b8;"><span class="label">Expected Business</span>' +
         '<span class="value">' + formatLakh(grandExpected.amount_lakh) + '</span>' +
@@ -1956,7 +1962,7 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
     m.plans.forEach(function(plan, i) {
         html += '<th><span class="plan-dot" style="background:' + planColor(plan, i) + ';"></span>' + escapeHtml(plan) + '</th>';
     });
-    html += '<th>Total Expected</th><th>Target</th><th>Current Pipeline</th><th class="mix-col">Plan Mix</th></tr></thead><tbody>';
+    html += '<th>Current Pipeline</th><th class="mix-col">Plan Mix</th></tr></thead><tbody>';
 
     m.quarters.forEach(function(quarter) {
 
@@ -1968,16 +1974,13 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
             rowTotal.count += cell.count;
         });
 
-        html += '<tr><td class="row-label">' + quarter + ' (Target = ' + formatLakh(targets[quarter]) + ')' +
+        html += '<tr><td class="row-label">' + quarter +
             '<span class="sub">' + QUARTER_INFO[quarter].range + '</span></td>';
 
         m.plans.forEach(function(plan) {
             html += lakhCell(m.matrix[quarter][plan], "qp:" + encodeURIComponent(quarter) + ":" + encodeURIComponent(plan));
         });
 
-        html += lakhCell(rowTotal, null, "total-col");
-        html += '<td class="amount-cell"><span class="big">' + formatLakh(targets[quarter]) + '</span>' +
-            pctBadge(rowTotal.amount_lakh, targets[quarter]) + '</td>';
         html += lakhCell(m.pipelineByQuarter[quarter], "quarter_pipeline:" + encodeURIComponent(quarter), null, true);
 
         html += '<td class="mix-col"><div class="mix-bar">';
@@ -1992,16 +1995,13 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
     });
 
     if (m.quarters.length > 1) {
-        html += '<tr class="grand-total"><td class="row-label">Grand Total (Target = ' + formatLakh(grandTarget) + ')</td>';
+        html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
         m.plans.forEach(function(plan) { html += '<td>' + formatLakh(m.planTotals[plan].amount_lakh) + '</td>'; });
-        html += '<td>' + formatLakh(grandExpected.amount_lakh) + '</td>';
-        html += '<td>' + formatLakh(grandTarget) + '<br>' + pctBadge(grandExpected.amount_lakh, grandTarget) + '</td>';
         html += '<td>' + formatLakh(grandPipeline.amount_lakh) + ' (' + accountsLabel(pipelineAccountCount) + ')</td>';
         html += '<td class="mix-col"></td></tr>';
     }
 
     html += '</tbody></table></div>';
-    html += '<div class="data-source">The % under Target is total expected business for the quarter divided by the target.</div>';
     html += notes;
 
     wrap.innerHTML = html;
@@ -2019,11 +2019,16 @@ function dataSourceNotes(m, live, missingOwners) {
         '), Plan = ' + escapeHtml(f.plan.label) + ' (' + escapeHtml(f.plan.api) +
         '), Product = ' + escapeHtml(f.product.label) + ' (' + escapeHtml(f.product.api) +
         '), Deal Type = ' + escapeHtml(f.dealType.label) + ' (' + escapeHtml(f.dealType.api) +
+        '), Expected Closing Date = ' + escapeHtml(f.closingDate.label) + ' (' + escapeHtml(f.closingDate.api) +
         '), Year = ' + escapeHtml(f.year.label) + ' (' + escapeHtml(f.year.api) +
         '), Gist Account Owner = ' + escapeHtml(f.gist.label) + ' (' + escapeHtml(f.gist.api) + ').</div>';
 
     var warnings = [];
 
+    if (!f.closingDate.found) {
+        warnings.push('No "Expected Closing Date" field was found on Deals, so quarters use "' + escapeHtml(f.closingDate.label) +
+            '". Set <code>DEAL_FIELDS.closingDate</code> to its API name.');
+    }
     if ((missingOwners || []).length) {
         warnings.push('No accounts found for ' + missingOwners.map(escapeHtml).join(", ") +
             '. Check the spelling in <code>ALLOWED_ACCOUNT_OWNERS</code>.');
@@ -2039,7 +2044,7 @@ function dataSourceNotes(m, live, missingOwners) {
         warnings.push('No deal has Deal Year ' + FY_FILTER + '. Set <code>DEAL_FIELDS.year</code> to your Deal Year API name.');
     }
     if (REQUIRE_CLOSING_DATE_IN_FY && live.outsideWindow > 0) {
-        warnings.push(live.outsideWindow + ' deals have Deal Year ' + FY_FILTER + ' but a Closing Date outside 1 Apr ' +
+        warnings.push(live.outsideWindow + ' deals have Deal Year ' + FY_FILTER + ' but an Expected Closing Date outside 1 Apr ' +
             FY_START_YEAR + ' - 31 Mar ' + (FY_START_YEAR + 1) + '. They are counted in the top cards but not in these ' +
             'tables or the funnel.');
     }
@@ -2067,8 +2072,9 @@ function dataSourceNotes(m, live, missingOwners) {
 
 function groupSubLabel(group) {
     var def = STAGE_GROUPS.filter(function(g) { return g.name === group; })[0];
-    if (!def) return "Not in a stage group";
-    return def.stages.length > 1 ? def.stages.join(", ") : "";
+    if (!def) return "";
+    var names = def.stages.filter(function(st) { return st !== def.name; });
+    return names.length ? names.join(", ") : "";
 }
 
 
@@ -2085,15 +2091,14 @@ function renderStageFunnel(m) {
     var wrap = document.getElementById("stageFunnelWrap");
     if (!wrap) return;
 
-    var groups = m.groups;
+    // Always the nine stage groups, in the order set in STAGE_GROUPS
+    var groups = STAGE_GROUPS.map(function(g) { return g.name; });
+    var empty = { amount_lakh: 0, count: 0, accounts: {} };
 
-    if (groups.length === 0) {
-        wrap.innerHTML = '<div class="loading">No deals for the selected filters.</div>';
-        return;
-    }
+    function totalsFor(group) { return m.groupTotals[group] || empty; }
 
-    var maxAmount = Math.max.apply(null, groups.map(function(g) { return m.groupTotals[g].amount_lakh; }));
-    var maxCount = Math.max.apply(null, groups.map(function(g) { return m.groupTotals[g].count; }));
+    var maxAmount = Math.max.apply(null, groups.map(function(g) { return totalsFor(g).amount_lakh; }));
+    var maxCount = Math.max.apply(null, groups.map(function(g) { return totalsFor(g).count; }));
     var useAmount = maxAmount > 0;
 
     var totalAmount = 0;
@@ -2102,16 +2107,18 @@ function renderStageFunnel(m) {
 
     groups.forEach(function(group, i) {
 
-        var t = m.groupTotals[group];
-        var ratio = useAmount ? t.amount_lakh / maxAmount : t.count / maxCount;
-        var width = Math.max(3, Math.round(ratio * 100));
+        var t = totalsFor(group);
+        var ratio = useAmount ? t.amount_lakh / maxAmount : (maxCount ? t.count / maxCount : 0);
+        var width = t.count ? Math.max(3, Math.round(ratio * 100)) : 0;
         var sub = groupSubLabel(group);
 
         totalAmount += t.amount_lakh;
         totalCount += t.count;
 
-        html += '<div class="funnel-row clickable" data-cat="stage:' + escapeHtml(encodeURIComponent(group)) + '" title="Click to see accounts">' +
-            '<div class="funnel-stage">' + escapeHtml(group) + (sub ? '<span class="sub">' + escapeHtml(sub) + '</span>' : '') + '</div>' +
+        html += '<div class="funnel-row' + (t.count ? ' clickable" data-cat="stage:' + escapeHtml(encodeURIComponent(group)) +
+                '" title="Click to see accounts"' : '"') + '>' +
+            '<div class="funnel-stage">' + (i + 1) + '. ' + escapeHtml(group) +
+                (sub ? '<span class="sub">' + escapeHtml(sub) + '</span>' : '') + '</div>' +
             '<div class="funnel-track"><div class="funnel-bar" style="width:' + width + '%;background:' + stageColor(group, i) + ';"></div></div>' +
             '<div class="funnel-value"><span class="big">' + formatLakh(t.amount_lakh) + '</span>' +
             '<span class="small">' + t.count + (t.count === 1 ? ' deal' : ' deals') + ', ' +
@@ -2122,6 +2129,13 @@ function renderStageFunnel(m) {
     html += '</div><div class="funnel-total">All stages: <strong>' + formatLakh(totalAmount) + '</strong> across ' +
         totalCount + ' deals</div>';
 
+    var others = Object.keys(m.groupTotals).filter(function(g) { return groups.indexOf(g) === -1; }).sort();
+    if (others.length) {
+        html += '<div class="data-source">Stages not in this list and not shown: ' + others.map(function(g) {
+            return escapeHtml(g) + ' (' + formatLakh(m.groupTotals[g].amount_lakh) + ', ' + m.groupTotals[g].count + (m.groupTotals[g].count === 1 ? ' deal)' : ' deals)');
+        }).join(", ") + '.</div>';
+    }
+
     wrap.innerHTML = html;
 }
 
@@ -2129,7 +2143,7 @@ function renderStageFunnel(m) {
 /* =========================================================
    ACCOUNT OWNER SUMMARY
    One row per selected owner (from the top filter). Accounts are
-   those with a Deal Type New deal (Knimbus Default left out).
+   those with a Deal Type New deal.
    ========================================================= */
 
 function toggleGistBreakdown(event) {
@@ -2269,9 +2283,9 @@ function renderAccountOwnerSummary() {
     }
 
     html += '</tbody></table></div>';
-    html += '<div class="data-source">Accounts with at least one Deal Type New deal whose Product isn\'t Knimbus Default. ' +
+    html += '<div class="data-source">Accounts with at least one Deal Type New deal. ' +
         'Closed Won and Closed Lost count those accounts with a deal in that stage group, Deal Year ' + FY_FILTER +
-        ', Closing Date in the selected period.</div>';
+        ', Expected Closing Date in the selected period.</div>';
 
     container.innerHTML = html;
 
