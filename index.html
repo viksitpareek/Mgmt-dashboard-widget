@@ -340,7 +340,13 @@ var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);
  * true  = a deal counts only if its Closing Date is between 1 Apr 2026 and 31 Mar 2027
  * false = Closing Date outside that range is still counted under "All Quarters"
  */
-var REQUIRE_CLOSING_DATE_IN_FY = true;
+var REQUIRE_CLOSING_DATE_IN_FY = true;   // tables, funnel and summary only
+
+/*
+ * The four amount cards (Achieved, Payment Received, Payment Pending,
+ * Current Pipeline) use Stage + Deal Year + Expected Business only.
+ * Closing Date is used for them only when a specific quarter is chosen.
+ */
 
 /*
  * Field API names. Leave "" to auto-detect. If the grey note under the
@@ -975,7 +981,7 @@ function accountMatchesGist(account, gistSelection) {
  * Cards, charts, summary and every drilldown use it, so numbers and
  * popup lists always agree. Returns null when the deal is filtered out.
  */
-function dealContext(deal, live, selectedQuarter, gistSelection) {
+function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 
     if (dealFiscalYear(deal) !== FY_FILTER) return null;
 
@@ -984,7 +990,7 @@ function dealContext(deal, live, selectedQuarter, gistSelection) {
 
     var closingDate = ddParseDate(deal[fieldInfo.closingDate]);
     var inWindow = isInFyWindow(closingDate);
-    if (REQUIRE_CLOSING_DATE_IN_FY && !inWindow) return null;
+    if (!cardMode && REQUIRE_CLOSING_DATE_IN_FY && !inWindow) return null;
 
     var quarter = inWindow ? monthQuarter(closingDate) : null;
     var allQuarters = !selectedQuarter || selectedQuarter === ALL_QUARTERS;
@@ -998,6 +1004,7 @@ function dealContext(deal, live, selectedQuarter, gistSelection) {
         account: account,
         accName: account ? account.name : ddLookupName(deal.Account_Name, "(Unnamed Account)"),
         quarter: quarter,
+        inWindow: inWindow,
         stage: String(deal.Stage || "").trim() || "Unknown",
         amount: dealAmountLakh(deal),
         plan: dealPlanName(deal),
@@ -1064,6 +1071,8 @@ function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
         planTotals: {},
         stageTotals: {},
         cards: { achieved: 0, payment_received: 0, payment_pending: 0, current_pipeline: 0 },
+        pipelineAccounts: {},
+        pipelineTableAccounts: {},
         periodDeals: 0,
         dealsWithAmount: 0,
         dealsWithPlan: 0
@@ -1071,21 +1080,27 @@ function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
 
     quarters.forEach(function(q) {
         m.matrix[q] = {};
-        m.pipelineByQuarter[q] = { amount_lakh: 0, count: 0 };
+        m.pipelineByQuarter[q] = { amount_lakh: 0, count: 0, accounts: {} };
     });
 
     live.deals.forEach(function(deal) {
 
-        var ctx = dealContext(deal, live, selectedQuarter, gistSelection);
+        // Cards: Stage + Deal Year + Expected Business (no closing-date window)
+        var ctx = dealContext(deal, live, selectedQuarter, gistSelection, true);
         if (!ctx) return;
+
+        CARD_CATEGORIES.forEach(function(category) {
+            if (!matchesCardCategory(ctx, category, ownerId)) return;
+            m.cards[category] += ctx.amount;
+            if (category === "current_pipeline") m.pipelineAccounts[ctx.accId] = true;
+        });
+
+        // Tables and funnel: also need the Closing Date inside the FY
+        if (REQUIRE_CLOSING_DATE_IN_FY && !ctx.inWindow) return;
 
         m.periodDeals++;
         if (ctx.amount) m.dealsWithAmount++;
         if (ctx.plan !== "No Plan") m.dealsWithPlan++;
-
-        CARD_CATEGORIES.forEach(function(category) {
-            if (matchesCardCategory(ctx, category, ownerId)) m.cards[category] += ctx.amount;
-        });
 
         if (!matchesAccountOwner(ctx, ownerId)) return;
 
@@ -1101,6 +1116,8 @@ function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
         if (isPipelineDeal(ctx)) {
             m.pipelineByQuarter[ctx.quarter].amount_lakh += ctx.amount;
             m.pipelineByQuarter[ctx.quarter].count += 1;
+            m.pipelineByQuarter[ctx.quarter].accounts[ctx.accId] = true;
+            m.pipelineTableAccounts[ctx.accId] = true;
         }
     });
 
@@ -1331,7 +1348,7 @@ function renderAll() {
 
             var metrics = computeDealMetrics(live, ownerId, gistSelection, selectedQuarter);
 
-            updateAmountCards(metrics.cards, Number(ownerCache.target_lakhs || 0));
+            updateAmountCards(metrics.cards, Number(ownerCache.target_lakhs || 0), metrics.pipelineAccounts);
             renderExpectedBusiness(metrics, live);
             renderStageFunnel(metrics);
 
@@ -1447,6 +1464,11 @@ function setCardValue(category, value) {
 }
 
 
+function accountsLabel(n) {
+    return Number(n).toLocaleString("en-IN") + (n === 1 ? " account" : " accounts");
+}
+
+
 function formatLakh(value) {
     var number = Number(value);
     if (isNaN(number)) number = 0;
@@ -1454,10 +1476,13 @@ function formatLakh(value) {
 }
 
 
-function updateAmountCards(cards, targetLakh) {
+function updateAmountCards(cards, targetLakh, pipelineAccounts) {
     CARD_CATEGORIES.forEach(function(category) {
         setCardValue(category, formatLakh(cards[category]));
     });
+    var pipelineCount = Object.keys(pipelineAccounts || {}).length;
+    setCardSub("current_pipeline", '<strong>' + pipelineCount.toLocaleString("en-IN") + '</strong>' +
+        (pipelineCount === 1 ? ' account' : ' accounts'));
     setCardSub("achieved", targetShareSub(cards.achieved, targetLakh));
     setCardSub("payment_received", targetShareSub(cards.payment_received, targetLakh));
 }
@@ -1516,17 +1541,20 @@ function planColor(plan, index) {
 }
 
 
-function lakhCell(bucket, category, extraClass) {
+function lakhCell(bucket, category, extraClass, showAccounts) {
 
     var amount = Number((bucket && bucket.amount_lakh) || 0);
     var count = Number((bucket && bucket.count) || 0);
+    var accountCount = bucket && bucket.accounts ? Object.keys(bucket.accounts).length : 0;
     var classes = "amount-cell" + (extraClass ? " " + extraClass : "") +
         (count && category ? " clickable" : "") + (!count ? " zero" : "");
     var dataAttr = count && category ? ' data-cat="' + escapeHtml(category) + '"' : "";
 
     return '<td class="' + classes + '"' + dataAttr + '>' +
         '<span class="big">' + amount.toFixed(2) + ' L</span>' +
-        '<span class="small">' + count + (count === 1 ? ' deal' : ' deals') + '</span></td>';
+        '<span class="small">' + (showAccounts
+            ? accountCount + (accountCount === 1 ? ' account' : ' accounts')
+            : count + (count === 1 ? ' deal' : ' deals')) + '</span></td>';
 }
 
 
@@ -1562,7 +1590,7 @@ function renderExpectedBusiness(m, live) {
 
     html += '<div class="eb-tile" style="border-left-color:#d97706;"><span class="label">Current Pipeline</span>' +
         '<span class="value">' + formatLakh(grandPipeline.amount_lakh) + '</span>' +
-        '<span class="sub">' + grandPipeline.count + ' open deals</span></div>';
+        '<span class="sub">' + accountsLabel(Object.keys(m.pipelineTableAccounts).length) + '</span></div>';
 
     m.plans.forEach(function(plan, i) {
         var total = m.planTotals[plan];
@@ -1599,7 +1627,7 @@ function renderExpectedBusiness(m, live) {
         });
 
         html += lakhCell(rowTotal, null, "total-col");
-        html += lakhCell(m.pipelineByQuarter[quarter], "quarter_pipeline:" + encodeURIComponent(quarter));
+        html += lakhCell(m.pipelineByQuarter[quarter], "quarter_pipeline:" + encodeURIComponent(quarter), null, true);
 
         html += '<td class="mix-col"><div class="mix-bar">';
         m.plans.forEach(function(plan, i) {
@@ -1616,7 +1644,7 @@ function renderExpectedBusiness(m, live) {
         html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
         m.plans.forEach(function(plan) { html += '<td>' + formatLakh(m.planTotals[plan].amount_lakh) + '</td>'; });
         html += '<td>' + formatLakh(grandExpected.amount_lakh) + '</td>';
-        html += '<td>' + formatLakh(grandPipeline.amount_lakh) + '</td>';
+        html += '<td>' + formatLakh(grandPipeline.amount_lakh) + ' (' + accountsLabel(Object.keys(m.pipelineTableAccounts).length) + ')</td>';
         html += '<td class="mix-col"></td></tr>';
     }
 
@@ -1646,8 +1674,8 @@ function dataSourceNotes(m, live) {
     }
     if (REQUIRE_CLOSING_DATE_IN_FY && live.outsideWindow > 0) {
         warnings.push(live.outsideWindow + ' deals have Deal Year ' + FY_FILTER + ' but a Closing Date outside ' +
-            '1 Apr ' + FY_START_YEAR + ' - 31 Mar ' + (FY_START_YEAR + 1) + ', so they are not counted. ' +
-            'Correct their Closing Date in Zoho to include them.');
+            '1 Apr ' + FY_START_YEAR + ' - 31 Mar ' + (FY_START_YEAR + 1) + '. They are counted in the top cards ' +
+            'but not in this table or the stage funnel. Correct their Closing Date in Zoho to include them here.');
     }
     if (!/expected ?business/i.test(f.amount.label + " " + f.amount.api.replace(/_/g, " "))) {
         warnings.push('No field named "Expected Business" was found on Deals, so amounts use "' +
@@ -2074,12 +2102,13 @@ async function runDrilldown(ownerId, ownerName, category) {
 
         live.deals.forEach(function(deal) {
 
-            var ctx = dealContext(deal, live, selectedQuarter, gistSelection);
+            var isCard = CARD_CATEGORIES.indexOf(category) !== -1;
+            var ctx = dealContext(deal, live, selectedQuarter, gistSelection, isCard);
             if (!ctx) return;
 
             var ok = false;
 
-            if (CARD_CATEGORIES.indexOf(category) !== -1) {
+            if (isCard) {
                 ok = matchesCardCategory(ctx, category, ownerId);
             } else if (matchesAccountOwner(ctx, ownerId)) {
                 if (kind === "qp") {
