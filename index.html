@@ -30,7 +30,8 @@
         .filter-group select { padding: 8px 12px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px; min-width: 190px; background: #ffffff; }
 
         .multi-select { position: relative; }
-        #ownerMultiButton {
+        #ownerFilter { padding: 8px 12px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px; min-width: 190px; background: #ffffff; }
+        .multi-button {
             padding: 8px 12px; border-radius: 6px; border: 1px solid #d1d5db; font-size: 14px;
             min-width: 210px; background: #ffffff; text-align: left; cursor: pointer; color: #111827;
         }
@@ -165,17 +166,17 @@
         </div>
         <div class="header-controls">
             <div class="filter-group">
-                <label>Account owner</label>
-                <div class="multi-select" id="ownerMulti">
-                    <button type="button" id="ownerMultiButton" onclick="toggleOwnerMenu(event)">All Owners &#9662;</button>
-                    <div class="multi-menu" id="ownerMultiMenu"></div>
-                </div>
+                <label for="ownerFilter">Account owner</label>
+                <select id="ownerFilter" onchange="onOwnerChange()">
+                    <option value="All Owners">All Owners</option>
+                </select>
             </div>
             <div class="filter-group hidden" id="gistFilterGroup">
-                <label for="gistOwnerFilter">Gist account owner</label>
-                <select id="gistOwnerFilter" onchange="renderAll()">
-                    <option value="__all_gist__">All Gist Account Owners</option>
-                </select>
+                <label>Gist account owner (select one or more)</label>
+                <div class="multi-select" id="gistMulti">
+                    <button type="button" class="multi-button" id="gistMultiButton" onclick="toggleGistMenu(event)">All Gist Account Owners &#9662;</button>
+                    <div class="multi-menu" id="gistMultiMenu"></div>
+                </div>
             </div>
             <div class="filter-group">
                 <label for="quarterFilter">Quarter</label>
@@ -316,7 +317,6 @@ var QUARTER_INFO = {
 };
 
 var ALL_QUARTERS = "All Quarters";
-var GIST_ACCOUNT_OWNER_DEFAULT = "__all_gist__";
 var GIST_NOT_ASSIGNED = "(Not assigned)";
 var CARD_CATEGORIES = ["achieved", "payment_received", "payment_pending", "current_pipeline"];
 
@@ -330,7 +330,8 @@ var CLOSED_LOST_KEYS = STAGE_GROUPS.filter(function(g) { return g.name === "Clos
 var PAYMENT_RECEIVED_KEYS = PAYMENT_RECEIVED_STAGES.map(normStage);
 var PAYMENT_PENDING_KEYS = PAYMENT_PENDING_STAGES.map(normStage);
 
-var selectedOwnerNames = [];   // empty = All Owners
+var selectedOwnerName = "All Owners";
+var selectedGistNames = [];    // empty = all Gist Account Owners
 var renderToken = 0;
 
 var liveDataPromise = null;
@@ -369,60 +370,33 @@ function populateQuarterFilter() {
 
 function populateOwnerFilter() {
 
-    var menu = document.getElementById("ownerMultiMenu");
-    var html = '<label class="multi-option all"><input type="checkbox" value="__all__" onchange="onOwnerCheckbox(this)"' +
-        (selectedOwnerNames.length === 0 ? ' checked' : '') + '> All Owners</label>';
+    var select = document.getElementById("ownerFilter");
+    var html = '<option value="All Owners">All Owners</option>';
 
     ALLOWED_ACCOUNT_OWNERS.forEach(function(name) {
-        html += '<label class="multi-option"><input type="checkbox" value="' + escapeHtml(name) + '" onchange="onOwnerCheckbox(this)"' +
-            (selectedOwnerNames.indexOf(name) !== -1 ? ' checked' : '') + '> ' + escapeHtml(name) + '</label>';
+        html += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
     });
 
-    menu.innerHTML = html;
-    document.getElementById("ownerMultiButton").innerHTML = escapeHtml(ownersLabel()) + ' &#9662;';
+    select.innerHTML = html;
+    select.value = selectedOwnerName;
+    if (select.value !== selectedOwnerName) { selectedOwnerName = "All Owners"; select.value = "All Owners"; }
 }
 
 
-function toggleOwnerMenu(event) {
-    if (event) event.stopPropagation();
-    document.getElementById("ownerMulti").classList.toggle("open");
-}
-
-
-document.addEventListener("click", function(event) {
-    var box = document.getElementById("ownerMulti");
-    if (box && !box.contains(event.target)) box.classList.remove("open");
-});
-
-
-function onOwnerCheckbox(input) {
-
-    if (input.value === "__all__") {
-        selectedOwnerNames = [];
-    } else if (input.checked) {
-        if (selectedOwnerNames.indexOf(input.value) === -1) selectedOwnerNames.push(input.value);
-    } else {
-        selectedOwnerNames = selectedOwnerNames.filter(function(n) { return n !== input.value; });
-    }
-
-    // Keep list order, and treat "every owner ticked" as All Owners
-    selectedOwnerNames = ALLOWED_ACCOUNT_OWNERS.filter(function(n) { return selectedOwnerNames.indexOf(n) !== -1; });
-    if (selectedOwnerNames.length === ALLOWED_ACCOUNT_OWNERS.length) selectedOwnerNames = [];
-
-    populateOwnerFilter();
+function onOwnerChange() {
+    selectedOwnerName = document.getElementById("ownerFilter").value || "All Owners";
+    if (!isGistHqName(selectedOwnerName)) selectedGistNames = [];
     renderAll();
 }
 
 
 function effectiveOwnerNames() {
-    return selectedOwnerNames.length ? selectedOwnerNames.slice() : ALLOWED_ACCOUNT_OWNERS.slice();
+    return selectedOwnerName === "All Owners" ? ALLOWED_ACCOUNT_OWNERS.slice() : [selectedOwnerName];
 }
 
 
 function ownersLabel() {
-    if (!selectedOwnerNames.length) return "All Owners";
-    if (selectedOwnerNames.length <= 2) return selectedOwnerNames.join(", ");
-    return selectedOwnerNames.length + " owners";
+    return selectedOwnerName;
 }
 
 
@@ -432,37 +406,84 @@ function isGistHqName(name) {
 
 
 function gistFilterVisible() {
-    return selectedOwnerNames.some(isGistHqName);
+    return isGistHqName(selectedOwnerName);
+}
+
+
+function gistSelectionLabel(names) {
+    if (!names || !names.length) return "All Gist Account Owners";
+    if (names.length <= 2) return names.join(", ");
+    return names.length + " Gist account owners";
 }
 
 
 function populateGistOwnerFilter() {
 
     var group = document.getElementById("gistFilterGroup");
-    var select = document.getElementById("gistOwnerFilter");
+    var menu = document.getElementById("gistMultiMenu");
     var showGist = gistFilterVisible();
-    var previous = select.value;
 
     group.classList.toggle("hidden", !showGist);
 
     var values = liveResolved ? liveResolved.gistValues : [];
-    var html = '<option value="' + GIST_ACCOUNT_OWNER_DEFAULT + '">All Gist Account Owners</option>';
 
-    if (!liveResolved) html += '<option disabled>Loading names...</option>';
-    else if (values.length === 0) html += '<option disabled>No Gist Account Owner values found</option>';
+    // Drop selections that no longer exist
+    if (liveResolved) selectedGistNames = selectedGistNames.filter(function(n) { return values.indexOf(n) !== -1; });
 
-    values.forEach(function(name) {
-        html += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+    var html = '<label class="multi-option all"><input type="checkbox" value="__all__" onchange="onGistCheckbox(this)"' +
+        (selectedGistNames.length === 0 ? ' checked' : '') + '> All Gist Account Owners</label>';
+
+    if (!liveResolved) html += '<div class="multi-option">Loading names...</div>';
+    else if (values.length === 0) html += '<div class="multi-option">No Gist Account Owner values found</div>';
+
+    values.forEach(function(name, i) {
+        html += '<label class="multi-option"><input type="checkbox" data-index="' + i + '" onchange="onGistCheckbox(this)"' +
+            (selectedGistNames.indexOf(name) !== -1 ? ' checked' : '') + '> ' + escapeHtml(name) + '</label>';
     });
 
-    select.innerHTML = html;
-    select.value = (showGist && values.indexOf(previous) !== -1) ? previous : GIST_ACCOUNT_OWNER_DEFAULT;
+    menu.innerHTML = html;
+    document.getElementById("gistMultiButton").innerHTML = escapeHtml(gistSelectionLabel(selectedGistNames)) + ' &#9662;';
 }
 
 
+function toggleGistMenu(event) {
+    if (event) event.stopPropagation();
+    document.getElementById("gistMulti").classList.toggle("open");
+}
+
+
+document.addEventListener("click", function(event) {
+    var box = document.getElementById("gistMulti");
+    if (box && !box.contains(event.target)) box.classList.remove("open");
+});
+
+
+function onGistCheckbox(input) {
+
+    var values = liveResolved ? liveResolved.gistValues : [];
+
+    if (input.value === "__all__") {
+        selectedGistNames = [];
+    } else {
+        var name = values[Number(input.getAttribute("data-index"))];
+        if (input.checked) {
+            if (name && selectedGistNames.indexOf(name) === -1) selectedGistNames.push(name);
+        } else {
+            selectedGistNames = selectedGistNames.filter(function(n) { return n !== name; });
+        }
+    }
+
+    selectedGistNames = values.filter(function(n) { return selectedGistNames.indexOf(n) !== -1; });
+    if (values.length && selectedGistNames.length === values.length) selectedGistNames = [];
+
+    renderAll();
+    document.getElementById("gistMulti").classList.add("open");
+}
+
+
+/* Array of selected Gist Account Owner names; empty = no Gist filter */
 function currentGistSelection() {
-    if (!gistFilterVisible()) return GIST_ACCOUNT_OWNER_DEFAULT;
-    return document.getElementById("gistOwnerFilter").value || GIST_ACCOUNT_OWNER_DEFAULT;
+    return gistFilterVisible() ? selectedGistNames.slice() : [];
 }
 
 
@@ -542,9 +563,10 @@ function teamRowsInScope(ownerNames, gistSelection) {
         if ((row.owners || []).some(function(o) { return names.indexOf(o.trim().toLowerCase()) !== -1; })) return true;
 
         if (includesGist && (row.gist || []).length) {
-            if (gistSelection === GIST_ACCOUNT_OWNER_DEFAULT) return true;
-            if (gistSelection === GIST_NOT_ASSIGNED) return false;
-            return gistNameMatchesKeywords(gistSelection, row.gist);
+            if (!gistSelection || !gistSelection.length) return true;
+            return gistSelection.some(function(name) {
+                return name !== GIST_NOT_ASSIGNED && gistNameMatchesKeywords(name, row.gist);
+            });
         }
 
         return false;
@@ -1011,13 +1033,12 @@ function hasExcludedProduct(ctx) {
 }
 
 
-/* The Gist filter only narrows GIST HQ accounts; other owners' accounts pass through */
+/* gistSelection = array of Gist Account Owner names; empty = no filter */
 function accountMatchesGist(account, gistSelection) {
-    if (!gistSelection || gistSelection === GIST_ACCOUNT_OWNER_DEFAULT) return true;
+    if (!gistSelection || !gistSelection.length) return true;
     if (!account) return false;
-    if (!isGistHqName(account.ownerName)) return true;
-    if (gistSelection === GIST_NOT_ASSIGNED) return account.gistNames.length === 0;
-    return account.gistNames.indexOf(gistSelection) !== -1;
+    if (gistSelection.indexOf(GIST_NOT_ASSIGNED) !== -1 && account.gistNames.length === 0) return true;
+    return account.gistNames.some(function(n) { return gistSelection.indexOf(n) !== -1; });
 }
 
 
@@ -1056,6 +1077,7 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
         plan: dealPlanName(deal),
         products: fieldValueList(deal[fieldInfo.product.api]),
         dealOwnerId: ddLookupId(deal.Owner),
+        dealOwnerName: ddLookupName(deal.Owner, ""),
         excluded: isExcludedTestDeal(deal)
     };
 }
@@ -1092,8 +1114,14 @@ function ownerSetFromNames(names, live) {
 
 /* Cards: scoped to the DEAL owner */
 function matchesCardCategory(ctx, category, ownerSet) {
-
     if (!ownerSet[ctx.dealOwnerId]) return false;
+    return cardStageMatch(ctx, category);
+}
+
+
+/* The card rules without the owner check (also used by Target vs Achievement) */
+function cardStageMatch(ctx, category) {
+
     if (isRemovedStage(ctx.stage)) return false;
 
     if (category === "achieved") return isClosedWonStage(ctx.stage) && !ctx.excluded;
@@ -1217,24 +1245,55 @@ function orderedGroups(present) {
 }
 
 
+/*
+ * Target vs Achievement uses exactly the Achieved card rules:
+ * deal owner, Closed Won stages, Deal Type New, Deal Year, test deals left out.
+ * Owner teams match on the DEAL owner. Gist teams match deals owned by
+ * GIST HQ on GIST HQ accounts whose Gist Account Owner matches the team.
+ */
+function teamIndexForDeal(ctx) {
+
+    var dealOwner = ctx.dealOwnerName.trim().toLowerCase();
+
+    for (var i = 0; i < SALES_TEAM_TARGETS.length; i++) {
+        if ((SALES_TEAM_TARGETS[i].owners || []).some(function(o) { return o.trim().toLowerCase() === dealOwner; })) return i;
+    }
+
+    if (isGistHqName(ctx.dealOwnerName) && ctx.account && isGistHqName(ctx.account.ownerName)) {
+        for (var j = 0; j < SALES_TEAM_TARGETS.length; j++) {
+            var row = SALES_TEAM_TARGETS[j];
+            if ((row.gist || []).length && ctx.account.gistNames.some(function(n) { return gistNameMatchesKeywords(n, row.gist); })) return j;
+        }
+    }
+
+    return -1;
+}
+
+
 function computeTeamMetrics(live) {
 
     var teams = SALES_TEAM_TARGETS.map(function() {
-        var t = { achieved: {}, pipelineA: {} };
+        var t = { achievedFY: 0, achieved: {}, pipelineA: {} };
         QUARTERS.forEach(function(q) { t.achieved[q] = 0; t.pipelineA[q] = 0; });
         return t;
     });
 
     live.deals.forEach(function(deal) {
 
-        var ctx = dealContext(deal, live, ALL_QUARTERS, GIST_ACCOUNT_OWNER_DEFAULT, false);
-        if (!ctx || !ctx.account || !ctx.quarter || !chartEligible(ctx)) return;
+        var ctx = dealContext(deal, live, ALL_QUARTERS, [], true);
+        if (!ctx) return;
 
-        var index = ctx.account.teamIndex;
+        var index = teamIndexForDeal(ctx);
         if (index < 0) return;
 
-        if (isClosedWonStage(ctx.stage) && !ctx.excluded) teams[index].achieved[ctx.quarter] += ctx.amount;
-        if (isPipelineDeal(ctx) && ctx.plan.trim().toLowerCase() === "plan a") teams[index].pipelineA[ctx.quarter] += ctx.amount;
+        if (cardStageMatch(ctx, "achieved")) {
+            teams[index].achievedFY += ctx.amount;
+            if (ctx.quarter) teams[index].achieved[ctx.quarter] += ctx.amount;
+        }
+
+        if (ctx.quarter && cardStageMatch(ctx, "current_pipeline") && ctx.plan.trim().toLowerCase() === "plan a") {
+            teams[index].pipelineA[ctx.quarter] += ctx.amount;
+        }
     });
 
     return teams;
@@ -1554,7 +1613,7 @@ function showLiveError(message) {
 
 function updateSummaryTitle(selectedQuarter, gistSelection) {
     var title = "Account Owner Summary (" + periodLabel(selectedQuarter) + ", Deal Type New";
-    if (gistSelection && gistSelection !== GIST_ACCOUNT_OWNER_DEFAULT) title += ", Gist account owner: " + gistSelection;
+    if (gistSelection && gistSelection.length) title += ", Gist account owner: " + gistSelection.join(", ");
     document.getElementById("aorTitle").innerText = title + ")";
 }
 
@@ -1720,7 +1779,8 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
 
         var row = item.row;
         var t = teams[item.index];
-        var fyAchieved = QUARTERS.reduce(function(s, q) { return s + t.achieved[q]; }, 0);
+        var fyAchieved = t.achievedFY;
+        var inQuarters = QUARTERS.reduce(function(s, q) { return s + t.achieved[q]; }, 0);
         var idx = item.index;
 
         html += '<tr><td class="row-label">' + escapeHtml(row.team) +
@@ -1734,7 +1794,8 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
             html += teamAmountCell(qa, "team:" + idx + ":" + selectedQuarter + ":achieved");
             html += '<td>' + pctBadge(qa, qt) + '</td>';
         } else {
-            html += teamAmountCell(fyAchieved, "team:" + idx + ":FY:achieved");
+            html += teamAmountCell(fyAchieved, "team:" + idx + ":FY:achieved",
+                fyAchieved - inQuarters > 0.005 ? formatLakh(fyAchieved - inQuarters) + " has no Closing Date in the FY" : "");
             html += '<td>' + pctBadge(fyAchieved, teamFyTarget(row)) + '</td>';
             QUARTERS.forEach(function(q) {
                 var target = teamQuarterTarget(row, q);
@@ -1779,9 +1840,9 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
 
     html += '</tbody></table></div>';
 
-    html += '<div class="data-source">Achieved = Closed Won stages, Deal Type New, Deal Year ' + FY_FILTER +
-        ', Closing Date in the quarter, Knimbus Default left out. Deals belong to a team through their account ' +
-        '(account owner, or Gist Account Owner for ' + GIST_HQ_OWNER_NAME + ' accounts).</div>';
+    html += '<div class="data-source">Achieved uses the same rules as the Achieved card: deal owner, Closed Won stages, ' +
+        'Deal Type New, Deal Year ' + FY_FILTER + '. FY Achieved matches the card with All Quarters; each quarter uses the ' +
+        'deal\'s Closing Date. ' + GIST_HQ_OWNER_NAME + ' deals are split into teams by the account\'s Gist Account Owner.</div>';
 
     var unmatched = live.gistValues.filter(function(name) {
         if (name === GIST_NOT_ASSIGNED) return false;
@@ -1806,9 +1867,10 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
 }
 
 
-function teamAmountCell(amount, category) {
+function teamAmountCell(amount, category, note) {
     var attrs = amount ? ' class="amount-cell clickable" data-cat="' + escapeHtml(category) + '"' : ' class="amount-cell zero"';
-    return '<td' + attrs + '><span class="big">' + formatLakh(amount) + '</span></td>';
+    return '<td' + attrs + '><span class="big">' + formatLakh(amount) + '</span>' +
+        (note ? '<span class="small">' + escapeHtml(note) + '</span>' : '') + '</td>';
 }
 
 
@@ -2096,7 +2158,7 @@ function ensureGistBreakdown() {
         if (gistId) set[gistId] = true;
 
         var names = live.gistValues.filter(function(v) {
-            return state.gistSelection === GIST_ACCOUNT_OWNER_DEFAULT || v === state.gistSelection;
+            return !state.gistSelection.length || state.gistSelection.indexOf(v) !== -1;
         });
 
         state.gistBreakdown = names.map(function(name) {
@@ -2217,7 +2279,7 @@ function renderAccountOwnerSummary() {
         el.onclick = function() {
             var gist = el.getAttribute("data-gist");
             var owner = el.getAttribute("data-owners");
-            openDrilldown({ names: [owner], gist: gist || aorLive.gistSelection, label: owner + (gist ? " / " + gist : "") },
+            openDrilldown({ names: [owner], gist: gist ? [gist] : aorLive.gistSelection, label: owner + (gist ? " / " + gist : "") },
                 el.getAttribute("data-cat"));
         };
     });
@@ -2387,7 +2449,7 @@ async function runDrilldown(scope, category) {
 
     var live = await loadLiveData();
     var ownerSet = ownerSetFromNames(scope.names, live).set;
-    var gistSelection = scope.gist || GIST_ACCOUNT_OWNER_DEFAULT;
+    var gistSelection = scope.gist || [];
     var selectedQuarter = currentQuarterSelection();
 
     var parts = category.split(":");
@@ -2401,13 +2463,12 @@ async function runDrilldown(scope, category) {
         var period = parts[2];
 
         live.deals.forEach(function(deal) {
-            var ctx = dealContext(deal, live, ALL_QUARTERS, GIST_ACCOUNT_OWNER_DEFAULT, false);
-            if (!ctx || !ctx.account || !ctx.quarter || !chartEligible(ctx)) return;
-            if (ctx.account.teamIndex !== teamIndex) return;
+            var ctx = dealContext(deal, live, ALL_QUARTERS, [], true);
+            if (!ctx || teamIndexForDeal(ctx) !== teamIndex) return;
             if (period !== "FY" && ctx.quarter !== period) return;
             var ok = parts[3] === "pipelineA"
-                ? isPipelineDeal(ctx) && ctx.plan.trim().toLowerCase() === "plan a"
-                : isClosedWonStage(ctx.stage) && !ctx.excluded;
+                ? cardStageMatch(ctx, "current_pipeline") && ctx.plan.trim().toLowerCase() === "plan a"
+                : cardStageMatch(ctx, "achieved");
             if (ok) unique[ctx.accId] = ctx.accName;
         });
 
