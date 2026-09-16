@@ -87,6 +87,8 @@
         .card-value.achieved { color: #059669; }
         .card-value.pending { color: #d97706; }
         .card-value.waiting { color: #9ca3af; font-size: 18px; }
+        .card-sub { font-size: 12px; color: #6b7280; margin-top: 6px; min-height: 15px; }
+        .card-sub strong { color: #374151; }
 
         .section {
             background: #ffffff;
@@ -346,11 +348,20 @@ var REQUIRE_CLOSING_DATE_IN_FY = true;
  * here (Setup > Developer Hub > APIs & SDKs > API Names).
  */
 var DEAL_FIELDS = {
-    amount: "",              // Deals: "Expected Business" (auto), else Amount
+    amount: "",              // Deals: the "Expected Business" field (auto)
     plan: "",                // Deals: Deal_Category, else a field labelled "Plan"
     year: "",                // Deals: Year2, else a field labelled "Year"
+    product: "",             // Deals: a field labelled "Product" (auto)
     closingDate: "Closing_Date"
 };
+
+/*
+ * Current Pipeline = sum of Expected Business where Product isn't one of these.
+ * Deals with no Product filled in are included (same as a Zoho "isn't" filter).
+ */
+var PIPELINE_EXCLUDED_PRODUCTS = ["Knimbus Default"];
+var PIPELINE_OPEN_STAGES_ONLY = true;      // also leave out won and Closed Lost deals
+var PIPELINE_REQUIRE_SAME_OWNER = true;    // card only: deal owner must also own the account
 
 var ACCOUNT_GIST_FIELD = "";   // Accounts: field labelled "Gist Account Owner" (auto)
 
@@ -757,11 +768,30 @@ function isAmountLike(o) {
 function chooseAmountField(options, deals) {
     if (DEAL_FIELDS.amount) return describeField(DEAL_FIELDS.amount, options, true);
     return pickByTiers(options, [
-        function(o) { return isAmountLike(o) && /expected business/.test(optionText(o)); },
+        function(o) { return /expected ?business/.test(optionText(o)); },
         function(o) { return o.api === "Amount"; },
         function(o) { return isAmountLike(o) && /business|lakh/.test(optionText(o)); },
         function(o) { return isAmountLike(o) && /expected|amount|value|revenue|total|price|deal size/.test(optionText(o)); }
-    ], function(api) { return countNonZero(deals, api); }) || describeField("Amount", options, false);
+    ], function(api) { return countNonZero(deals, api); }) || expectedBusinessFallback(options);
+}
+
+
+function expectedBusinessFallback(options) {
+    for (var i = 0; i < options.length; i++) {
+        if (/expected ?business/.test(optionText(options[i]))) {
+            return { api: options[i].api, label: options[i].label, found: true };
+        }
+    }
+    return describeField("Amount", options, false);
+}
+
+
+function chooseProductField(options, deals) {
+    if (DEAL_FIELDS.product) return describeField(DEAL_FIELDS.product, options, true);
+    return pickByTiers(options, [
+        function(o) { return o.api === "Product" || o.api === "Product_Name"; },
+        function(o) { return /\bproducts?\b/.test(optionText(o)) && !/amount|price|qty|quantity|code|id\b/.test(optionText(o)); }
+    ], function(api) { return countNonEmpty(deals, api); }) || describeField("Product", options, false);
 }
 
 
@@ -798,6 +828,7 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
 
     fieldInfo.amount = chooseAmountField(dealOptions, scope);
     fieldInfo.plan = choosePlanField(dealOptions, scope);
+    fieldInfo.product = chooseProductField(dealOptions, scope);
 
     var gistHqAccounts = accounts.filter(function(a) { return isGistHqName(ddLookupName(a.Owner, "")); });
     fieldInfo.gist = chooseGistField(accountOptions, gistHqAccounts.length ? gistHqAccounts : accounts);
@@ -970,9 +1001,20 @@ function dealContext(deal, live, selectedQuarter, gistSelection) {
         stage: String(deal.Stage || "").trim() || "Unknown",
         amount: dealAmountLakh(deal),
         plan: dealPlanName(deal),
+        products: fieldValueList(deal[fieldInfo.product.api]),
         dealOwnerId: ddLookupId(deal.Owner),
         excluded: isExcludedTestDeal(deal)
     };
+}
+
+
+/* Current Pipeline: Product isn't Knimbus Default (+ open stage if configured) */
+function isPipelineDeal(ctx) {
+    var excluded = PIPELINE_EXCLUDED_PRODUCTS.map(function(p) { return p.trim().toLowerCase(); });
+    var hasExcludedProduct = ctx.products.some(function(p) { return excluded.indexOf(p.trim().toLowerCase()) !== -1; });
+    if (hasExcludedProduct) return false;
+    if (PIPELINE_OPEN_STAGES_ONLY && !isCurrentPipelineStage(ctx.stage)) return false;
+    return true;
 }
 
 
@@ -985,7 +1027,8 @@ function matchesCardCategory(ctx, category, ownerId) {
     if (category === "payment_received") return PAYMENT_RECEIVED_STAGES.indexOf(ctx.stage) !== -1 && !ctx.excluded;
     if (category === "payment_pending") return PAYMENT_PENDING_STAGES.indexOf(ctx.stage) !== -1;
     if (category === "current_pipeline") {
-        return isCurrentPipelineStage(ctx.stage) && !!ctx.account && ctx.account.ownerId === ctx.dealOwnerId;
+        if (!isPipelineDeal(ctx)) return false;
+        return !PIPELINE_REQUIRE_SAME_OWNER || (!!ctx.account && ctx.account.ownerId === ctx.dealOwnerId);
     }
     return false;
 }
@@ -1055,7 +1098,7 @@ function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
             addAmount(m.planTotals, ctx.plan, ctx.amount);
         }
 
-        if (isCurrentPipelineStage(ctx.stage)) {
+        if (isPipelineDeal(ctx)) {
             m.pipelineByQuarter[ctx.quarter].amount_lakh += ctx.amount;
             m.pipelineByQuarter[ctx.quarter].count += 1;
         }
@@ -1238,12 +1281,15 @@ function renderAll() {
     html += '</div>';
 
     html += '<div class="card-row">';
-    html += cardHtml("Total Accounts", gistActive ? "Calculating..." : (ownerCache.total_accounts || 0),
+    var cachedTotal = ownerCache.total_accounts || 0;
+    html += cardHtml("Total Accounts", gistActive ? "Calculating..." : cachedTotal,
         gistActive ? "waiting" : "", "total_accounts");
     html += cardHtml("Untouched Accounts", gistActive ? "Calculating..." : (ownerCache.untouched || 0),
-        gistActive ? "pending waiting" : "pending", "untouched");
+        gistActive ? "pending waiting" : "pending", "untouched",
+        gistActive ? "" : accountShareSub(ownerCache.untouched, cachedTotal));
     html += cardHtml("Touched", gistActive ? "Calculating..." : (ownerCache.touched || 0),
-        gistActive ? "achieved waiting" : "achieved", "touched");
+        gistActive ? "achieved waiting" : "achieved", "touched",
+        gistActive ? "" : accountShareSub(ownerCache.touched, cachedTotal));
     html += cardHtml("Current Pipeline", "Calculating...", "pending waiting", "current_pipeline");
     html += '</div>';
 
@@ -1285,7 +1331,7 @@ function renderAll() {
 
             var metrics = computeDealMetrics(live, ownerId, gistSelection, selectedQuarter);
 
-            updateAmountCards(metrics.cards);
+            updateAmountCards(metrics.cards, Number(ownerCache.target_lakhs || 0));
             renderExpectedBusiness(metrics, live);
             renderStageFunnel(metrics);
 
@@ -1309,6 +1355,8 @@ function renderAll() {
             setCardValue("total_accounts", stats.total);
             setCardValue("untouched", stats.untouched);
             setCardValue("touched", stats.touched);
+            setCardSub("untouched", accountShareSub(stats.untouched, stats.total));
+            setCardSub("touched", accountShareSub(stats.touched, stats.total));
 
             var bucketWrap = document.getElementById("bucketWrap");
             if (bucketWrap) bucketWrap.innerHTML = renderBucketTable(stats.bucket_summary);
@@ -1353,12 +1401,41 @@ function updateAccountOwnerSummaryDisplay() {
 }
 
 
-function cardHtml(title, value, colorClass, category) {
+function cardHtml(title, value, colorClass, category, sub) {
     var clickableClass = category ? " clickable" : "";
     var dataAttr = category ? ' data-cat="' + category + '"' : "";
     var idAttr = category ? ' id="card-' + category + '"' : "";
+    var subId = category ? ' id="card-sub-' + category + '"' : "";
     return '<div class="card"><div class="card-title">' + escapeHtml(title) + '</div>' +
-        '<div class="card-value ' + colorClass + clickableClass + '"' + idAttr + dataAttr + '>' + value + '</div></div>';
+        '<div class="card-value ' + colorClass + clickableClass + '"' + idAttr + dataAttr + '>' + value + '</div>' +
+        '<div class="card-sub"' + subId + '>' + (sub || "") + '</div></div>';
+}
+
+
+function setCardSub(category, html) {
+    var el = document.getElementById("card-sub-" + category);
+    if (el) el.innerHTML = html || "";
+}
+
+
+function percentText(part, whole) {
+    part = Number(part || 0);
+    whole = Number(whole || 0);
+    if (!whole) return null;
+    var pct = (part / whole) * 100;
+    return (pct >= 10 || pct === 0 ? pct.toFixed(0) : pct.toFixed(1)) + "%";
+}
+
+
+function accountShareSub(count, total) {
+    var pct = percentText(count, total);
+    return pct ? '<strong>' + pct + '</strong> of ' + Number(total).toLocaleString("en-IN") + ' accounts' : "";
+}
+
+
+function targetShareSub(amountLakh, targetLakh) {
+    var pct = percentText(amountLakh, targetLakh);
+    return pct ? '<strong>' + pct + '</strong> of ' + formatLakh(targetLakh) + ' target' : "No target set";
 }
 
 
@@ -1377,10 +1454,12 @@ function formatLakh(value) {
 }
 
 
-function updateAmountCards(cards) {
+function updateAmountCards(cards, targetLakh) {
     CARD_CATEGORIES.forEach(function(category) {
         setCardValue(category, formatLakh(cards[category]));
     });
+    setCardSub("achieved", targetShareSub(cards.achieved, targetLakh));
+    setCardSub("payment_received", targetShareSub(cards.payment_received, targetLakh));
 }
 
 
@@ -1554,6 +1633,7 @@ function dataSourceNotes(m, live) {
     var html = '<div class="data-source">' + live.deals.length + ' deals loaded; ' + m.periodDeals +
         ' match the selected filters. Amount: ' + escapeHtml(f.amount.label) + ' (' + escapeHtml(f.amount.api) +
         ', read as ' + amountUnitInUse + '). Plan: ' + escapeHtml(f.plan.label) + ' (' + escapeHtml(f.plan.api) +
+        '). Product: ' + escapeHtml(f.product.label) + ' (' + escapeHtml(f.product.api) +
         '). Year: ' + escapeHtml(f.year.label) + ' (' + escapeHtml(f.year.api) + '). Quarter: ' +
         escapeHtml(f.closingDate) + '. Gist account owner: ' + escapeHtml(f.gist.label) + ' (' +
         escapeHtml(f.gist.api) + ').</div>';
@@ -1568,6 +1648,14 @@ function dataSourceNotes(m, live) {
         warnings.push(live.outsideWindow + ' deals have Deal Year ' + FY_FILTER + ' but a Closing Date outside ' +
             '1 Apr ' + FY_START_YEAR + ' - 31 Mar ' + (FY_START_YEAR + 1) + ', so they are not counted. ' +
             'Correct their Closing Date in Zoho to include them.');
+    }
+    if (!/expected ?business/i.test(f.amount.label + " " + f.amount.api.replace(/_/g, " "))) {
+        warnings.push('No field named "Expected Business" was found on Deals, so amounts use "' +
+            escapeHtml(f.amount.label) + '". Set <code>DEAL_FIELDS.amount</code> to the Expected Business API name.');
+    }
+    if (!f.product.found) {
+        warnings.push('No Product field was found on Deals, so Current Pipeline cannot leave out ' +
+            escapeHtml(PIPELINE_EXCLUDED_PRODUCTS.join(", ")) + '. Set <code>DEAL_FIELDS.product</code> to its API name.');
     }
     if (m.periodDeals > 0 && m.dealsWithAmount === 0) {
         warnings.push('Every deal amount is 0 in the field "' + escapeHtml(f.amount.label) + '". Set ' +
@@ -1998,7 +2086,7 @@ async function runDrilldown(ownerId, ownerName, category) {
                     ok = ctx.quarter === decodeURIComponent(parts[1]) &&
                         ctx.plan === decodeURIComponent(parts[2]) && countsAsExpected(ctx);
                 } else if (kind === "quarter_pipeline") {
-                    ok = ctx.quarter === decodeURIComponent(parts[1]) && isCurrentPipelineStage(ctx.stage);
+                    ok = ctx.quarter === decodeURIComponent(parts[1]) && isPipelineDeal(ctx);
                 } else if (kind === "stage") {
                     ok = ctx.stage === decodeURIComponent(parts[1]);
                 } else if (kind === "won_accounts") {
