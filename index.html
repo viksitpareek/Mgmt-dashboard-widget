@@ -36,38 +36,26 @@
         .header h1 { margin: 0 0 4px 0; font-size: 22px; color: #1f2937; }
         .header p { margin: 0; color: #6b7280; font-size: 13px; }
 
-        .header-controls {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
+        .header-controls { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 
-        #ownerFilter {
+        .filter-group { display: flex; flex-direction: column; gap: 3px; }
+        .filter-group label { font-size: 11px; color: #6b7280; }
+        .filter-group.hidden { display: none; }
+
+        .filter-group select {
             padding: 8px 12px;
             border-radius: 6px;
             border: 1px solid #d1d5db;
             font-size: 14px;
-            min-width: 200px;
+            min-width: 190px;
+            background: #ffffff;
         }
-
-        #gistOwnerFilter, #quarterFilter {
-            padding: 8px 12px;
-            border-radius: 6px;
-            border: 1px solid #d1d5db;
-            font-size: 14px;
-            min-width: 180px;
-            display: none;
-        }
-
-        #gistOwnerFilter.visible { display: inline-block; }
-        #quarterFilter { display: inline-block; }
 
         #refreshButton {
             background: #2563eb;
             color: #ffffff;
             border: none;
-            padding: 8px 16px;
+            padding: 9px 16px;
             border-radius: 6px;
             cursor: pointer;
             font-size: 14px;
@@ -76,7 +64,7 @@
 
         #refreshButton:disabled { background: #9ca3af; }
 
-        .last-updated { font-size: 12px; color: #6b7280; }
+        .last-updated { font-size: 12px; color: #6b7280; padding-bottom: 9px; }
 
         .card-row {
             display: grid;
@@ -98,6 +86,7 @@
         .card-value.target { color: #7c3aed; }
         .card-value.achieved { color: #059669; }
         .card-value.pending { color: #d97706; }
+        .card-value.waiting { color: #9ca3af; font-size: 18px; }
 
         .section {
             background: #ffffff;
@@ -107,11 +96,9 @@
             margin-bottom: 20px;
         }
 
-        .section h2 {
-            margin: 0 0 15px 0;
-            font-size: 17px;
-            color: #1f2937;
-        }
+        .section h2 { margin: 0 0 15px 0; font-size: 17px; color: #1f2937; }
+
+        .table-scroll { overflow-x: auto; }
 
         table { border-collapse: collapse; width: 100%; }
 
@@ -125,26 +112,25 @@
         th { background: #1f4e78; color: #ffffff; }
 
         td.row-label { text-align: left; font-weight: 600; }
+        td.row-label .sub { display: block; font-weight: 400; font-size: 11px; color: #6b7280; }
 
         tr.grand-total { background: #d9eaf7; font-weight: 700; }
         tbody tr:nth-child(even) { background: #f7f9fb; }
 
-        .amount-cell .big { font-size: 16px; font-weight: 700; display: block; color: #1f2937; }
-        .amount-cell .small { font-size: 11px; color: #6b7280; }
-
         .loading { padding: 30px; text-align: center; color: #6b7280; }
         .error { padding: 15px; background: #fee2e2; border: 1px solid #fecaca; border-radius: 6px; color: #991b1b; font-size: 14px; }
 
-        .card-value.clickable, td.clickable {
-            cursor: pointer;
+        .card-value.clickable, td.clickable, .funnel-row.clickable { cursor: pointer; }
+
+        .card-value.clickable, td.clickable .big, td.clickable.plain {
             text-decoration: underline;
             text-decoration-style: dotted;
             text-decoration-color: #93c5fd;
         }
 
-        .card-value.clickable:hover, td.clickable:hover {
-            opacity: 0.75;
-        }
+        .card-value.clickable:hover, td.clickable:hover { opacity: 0.75; }
+
+        /* ---- Modal ---- */
 
         .modal-overlay {
             display: none;
@@ -178,128 +164,106 @@
         }
 
         .modal-header h3 { margin: 0; font-size: 16px; color: #1f2937; }
-
-        .modal-close {
-            background: none; border: none; font-size: 20px;
-            cursor: pointer; color: #6b7280; line-height: 1;
-        }
-
+        .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #6b7280; line-height: 1; }
         .modal-body { padding: 12px 20px; overflow-y: auto; }
         .modal-body ul { margin: 0; padding-left: 20px; }
         .modal-body li { padding: 4px 0; font-size: 13px; color: #374151; }
         .modal-empty { color: #6b7280; font-size: 13px; padding: 10px 0; }
+        .modal-count { font-size: 12px; color: #6b7280; margin-bottom: 8px; }
 
-        /* ---- Quarter x plan table ---- */
+        /* ---- Expected business ---- */
 
-        .chart-canvas-wrap {
-            position: relative;
-            max-width: 1100px;
-            margin: 0 auto;
-            overflow-x: auto;
-        }
-
-        .expected-business-table th {
-            white-space: nowrap;
-        }
-
-        .expected-business-table td.clickable {
-            color: #1457b8;
-            font-weight: 600;
-        }
-
-        .expected-business-total {
-            background: #eef6ff;
-            font-weight: 700;
-        }
-
-        .pipeline-summary {
-            display: flex;
+        .eb-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
             gap: 12px;
-            flex-wrap: wrap;
-            margin: 0 0 15px 0;
+            margin-bottom: 16px;
         }
 
-        .pipeline-summary-card {
-            min-width: 180px;
-            padding: 10px 14px;
+        .eb-tile {
             border: 1px solid #dbe3ec;
+            border-left: 5px solid #1f4e78;
             border-radius: 7px;
+            padding: 10px 14px;
             background: #f8fafc;
         }
 
-        .pipeline-summary-card .label {
-            display: block;
-            color: #6b7280;
-            font-size: 12px;
-            margin-bottom: 4px;
+        .eb-tile .label { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+        .eb-tile .value { display: block; font-size: 20px; font-weight: 700; color: #111827; }
+        .eb-tile .sub { display: block; font-size: 11px; color: #6b7280; margin-top: 2px; }
+
+        .eb-table th { white-space: nowrap; }
+
+        .plan-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+            border: 1px solid rgba(255,255,255,0.7);
         }
 
-        .pipeline-summary-card .value {
-            color: #111827;
-            font-size: 18px;
-            font-weight: 700;
-        }
+        .amount-cell .big { font-size: 15px; font-weight: 700; display: block; color: #1f2937; }
+        .amount-cell .small { font-size: 11px; color: #6b7280; }
+        .amount-cell.zero .big { color: #b6bec9; font-weight: 400; }
+        .amount-cell.total-col { background: #eef6ff; }
+        .amount-cell.total-col .big { color: #1457b8; }
 
-        /* ---- Funnel (custom SVG) ---- */
+        .mix-col { min-width: 160px; }
+        .mix-bar { display: flex; height: 14px; border-radius: 3px; overflow: hidden; background: #eef1f5; }
+        .mix-bar span { display: block; height: 100%; }
 
-        .funnel-wrap {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 32px;
-            max-width: 700px;
-            margin: 0 auto;
-            flex-wrap: wrap;
-        }
+        .data-source { margin-top: 10px; font-size: 12px; color: #6b7280; line-height: 1.5; }
 
-        .funnel-svg {
-            width: 220px;
-            height: auto;
-            flex-shrink: 0;
-            filter: drop-shadow(0 3px 6px rgba(0,0,0,0.15));
-        }
-
-        .funnel-svg polygon {
-            cursor: pointer;
-            transition: opacity 0.15s;
-        }
-
-        .funnel-svg polygon:hover { opacity: 0.85; }
-
-        .funnel-labels {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            min-width: 220px;
-            flex: 1;
-            max-width: 320px;
-        }
-
-        .funnel-label-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 8px 10px;
+        .warn-note {
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: #fffbeb;
+            border: 1px solid #fde68a;
             border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.15s;
+            color: #92400e;
+            font-size: 13px;
         }
 
-        .funnel-label-row:hover { background: #f3f4f6; }
+        .warn-note code { background: #fef3c7; padding: 1px 4px; border-radius: 3px; }
 
-        .funnel-label-dot {
-            width: 14px;
-            height: 14px;
-            border-radius: 3px;
-            flex-shrink: 0;
+        /* ---- Stage funnel ---- */
+
+        .funnel { display: flex; flex-direction: column; gap: 6px; }
+
+        .funnel-row {
+            display: grid;
+            grid-template-columns: 230px 1fr 140px;
+            align-items: center;
+            gap: 12px;
+            padding: 4px 6px;
+            border-radius: 6px;
         }
 
-        .funnel-label-text { font-size: 13px; color: #374151; }
-        .funnel-label-text .stage-name { font-weight: 700; color: #1f2937; display: block; }
-        .funnel-label-text .stage-value { font-size: 12px; color: #6b7280; }
+        .funnel-row:hover { background: #f3f4f6; }
+        .funnel-stage { font-size: 13px; font-weight: 600; color: #1f2937; }
+        .funnel-track { display: flex; justify-content: center; }
+        .funnel-bar { height: 26px; border-radius: 4px; min-width: 6px; }
+        .funnel-value { text-align: right; }
+        .funnel-value .big { display: block; font-size: 14px; font-weight: 700; color: #1f2937; }
+        .funnel-value .small { font-size: 11px; color: #6b7280; }
+
+        .funnel-total {
+            margin-top: 8px;
+            padding-top: 10px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 13px;
+            color: #374151;
+            text-align: right;
+        }
+
+        .section-note { font-size: 12px; color: #6b7280; margin: -8px 0 12px 0; }
 
         @media (max-width: 900px) {
             .card-row { grid-template-columns: repeat(2, 1fr); }
+            .funnel-row { grid-template-columns: 140px 1fr 100px; }
+            .mix-col { display: none; }
         }
     </style>
 </head>
@@ -314,19 +278,22 @@
             <p>Owner-filterable target, activity, and pipeline overview</p>
         </div>
         <div class="header-controls">
-            <select id="ownerFilter" onchange="renderAll()">
-                <option value="All Owners">All Owners</option>
-            </select>
-            <select id="gistOwnerFilter" onchange="renderAll()">
-                <option value="All GIST Account Owners">All GIST Account Owners</option>
-            </select>
-            <select id="quarterFilter" onchange="renderAll()">
-                <option value="All Quarters">All Quarters</option>
-                <option value="Q1">Q1</option>
-                <option value="Q2">Q2</option>
-                <option value="Q3">Q3</option>
-                <option value="Q4">Q4</option>
-            </select>
+            <div class="filter-group">
+                <label for="ownerFilter">Account owner</label>
+                <select id="ownerFilter" onchange="renderAll()">
+                    <option value="All Owners">All Owners</option>
+                </select>
+            </div>
+            <div class="filter-group hidden" id="gistFilterGroup">
+                <label for="gistOwnerFilter">Gist account owner</label>
+                <select id="gistOwnerFilter" onchange="renderAll()">
+                    <option value="__all_gist__">All Gist Account Owners</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="quarterFilter">Quarter</label>
+                <select id="quarterFilter" onchange="renderAll()"></select>
+            </div>
             <button id="refreshButton" onclick="loadReport()">Refresh</button>
             <div class="last-updated" id="lastUpdated">Last Updated: -</div>
         </div>
@@ -337,7 +304,7 @@
     </div>
 
     <div class="section">
-        <h2>Account Owner Summary (FY 2026-27)</h2>
+        <h2 id="aorTitle">Account Owner Summary (FY 2026-27)</h2>
         <div id="accountOwnerSummarySection">
             <div class="loading">Loading account owner summary...</div>
         </div>
@@ -357,36 +324,196 @@
 
 <script>
 
+/* =========================================================
+   CONFIGURATION
+   ========================================================= */
+
+/* Financial year: 1 April FY_START_YEAR to 31 March FY_START_YEAR + 1 */
+var FY_START_YEAR = 2026;
+
+/* Deal Year value the dashboard is scoped to (your Year2 field) */
+var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);
+
+/*
+ * true  = a deal counts only if its Closing Date is between 1 Apr 2026 and 31 Mar 2027
+ * false = Closing Date outside that range is still counted under "All Quarters"
+ */
+var REQUIRE_CLOSING_DATE_IN_FY = true;
+
+/*
+ * Field API names. Leave "" to auto-detect. If the grey note under the
+ * Quarter x Plan table shows the wrong field, type the correct API name
+ * here (Setup > Developer Hub > APIs & SDKs > API Names).
+ */
+var DEAL_FIELDS = {
+    amount: "",              // Deals: "Expected Business" (auto), else Amount
+    plan: "",                // Deals: Deal_Category, else a field labelled "Plan"
+    year: "",                // Deals: Year2, else a field labelled "Year"
+    closingDate: "Closing_Date"
+};
+
+var ACCOUNT_GIST_FIELD = "";   // Accounts: field labelled "Gist Account Owner" (auto)
+
+/* "rupees" = stored like 1112000, "lakh" = stored like 11.12, "auto" = decide from the data */
+var AMOUNT_UNIT = "auto";
+
+/* Closed Lost deals are not counted as expected business (they still show in the stage funnel) */
+var EXCLUDE_LOST_FROM_EXPECTED = true;
+
+var ALLOWED_ACCOUNT_OWNERS = ["Anurag Mishra", "Tejal Pandya", "GIST HQ"];
+var GIST_HQ_OWNER_NAME = "GIST HQ";
+
+var PAYMENT_RECEIVED_STAGES = ["Payment Received", "Short Payment", "Part Payment Received"];
+var PAYMENT_PENDING_STAGES = ["Order Booked", "Email Confirmation", "PI Sent - Order Received"];
+var CLOSED_WON_STAGES = PAYMENT_RECEIVED_STAGES.concat(PAYMENT_PENDING_STAGES, ["Closed Won"]);
+var CLOSED_LOST_STAGE = "Closed Lost";
+var EXCLUDED_DEAL_NAME_WORDS = ["test", "trigya"];
+
+var STAGE_ORDER = [
+    "Met and Interested",
+    "Demonstrated and Queries Handled",
+    "Proposal Sent",
+    "Negotiation/Review",
+    "PI Sent - Order Received",
+    "Email Confirmation",
+    "Order Booked",
+    "Part Payment Received",
+    "Short Payment",
+    "Payment Received",
+    "Closed Won",
+    "Closed Lost"
+];
+
+var PLAN_COLORS = { "Plan A": "#d64550", "Plan B": "#f0b429", "Plan C": "#e8919c", "No Plan": "#9ca3af" };
+var EXTRA_PLAN_COLORS = ["#0ea5e9", "#8b5cf6", "#10b981", "#f97316", "#6b7280"];
+
+
+/* =========================================================
+   CONSTANTS / STATE
+   ========================================================= */
+
+var FY_SHORT_LABEL = "FY " + String(FY_START_YEAR).slice(2) + "-" + String(FY_START_YEAR + 1).slice(2);
+var FY_LONG_LABEL = "FY " + FY_START_YEAR + "-" + String(FY_START_YEAR + 1).slice(2);
+var FY_START = new Date(FY_START_YEAR, 3, 1, 0, 0, 0, 0);
+var FY_END = new Date(FY_START_YEAR + 1, 2, 31, 23, 59, 59, 999);
+
+var QUARTER_INFO = {
+    Q1: { range: "1 Apr - 30 Jun " + FY_START_YEAR, short: "Apr-Jun " + FY_START_YEAR },
+    Q2: { range: "1 Jul - 30 Sep " + FY_START_YEAR, short: "Jul-Sep " + FY_START_YEAR },
+    Q3: { range: "1 Oct - 31 Dec " + FY_START_YEAR, short: "Oct-Dec " + FY_START_YEAR },
+    Q4: { range: "1 Jan - 31 Mar " + (FY_START_YEAR + 1), short: "Jan-Mar " + (FY_START_YEAR + 1) }
+};
+
+var ALL_QUARTERS = "All Quarters";
+var GIST_ACCOUNT_OWNER_DEFAULT = "__all_gist__";
+var GIST_NOT_ASSIGNED = "(Not assigned)";
+var CARD_CATEGORIES = ["achieved", "payment_received", "payment_pending", "current_pipeline"];
+
 var lastReportData = null;
 var lastAccountOwnerSummaryData = null;
 var renderToken = 0;
 
-/* Change this if your Deals module's amount field API name is different from "Amount" */
-var DEAL_AMOUNT_FIELD = "Amount";
+var liveDataPromise = null;
+var liveResolved = null;
+var fieldInfo = null;
+var amountUnitInUse = "rupees";
+var callsCache = {};
+var aorLive = null;
 
-var PLAN_COLORS = {
-    "Plan A": "#d64550",
-    "Plan B": "#f0b429",
-    "Plan C": "#e8919c"
-};
-var EXTRA_PLAN_COLORS = ["#6b7280", "#0ea5e9", "#8b5cf6", "#10b981", "#f97316"];
-
-var allDealsCache = null;
-var stackedChartInstance = null;
-var GIST_ACCOUNT_OWNER_DEFAULT = "All GIST Account Owners";
-var ALLOWED_ACCOUNT_OWNERS = ["Anurag Mishra", "Tejal Pandya", "GIST HQ"];
-var CLOSED_WON_STAGES = [
-    "Payment Received",
-    "Short Payment",
-    "Part Payment Received",
-    "Order Booked",
-    "Email Confirmation",
-    "PI Sent - Order Received"
-];
+populateQuarterFilter();
 
 ZOHO.embeddedApp.on("PageLoad", function() { loadReport(); loadAccountOwnerSummary(); });
 ZOHO.embeddedApp.init();
 
+
+/* =========================================================
+   FILTERS
+   ========================================================= */
+
+function populateQuarterFilter() {
+    var select = document.getElementById("quarterFilter");
+    var html = '<option value="' + ALL_QUARTERS + '">All Quarters (1 Apr ' + FY_START_YEAR +
+        ' - 31 Mar ' + (FY_START_YEAR + 1) + ')</option>';
+    ["Q1", "Q2", "Q3", "Q4"].forEach(function(q) {
+        html += '<option value="' + q + '">' + q + ' (' + QUARTER_INFO[q].range + ')</option>';
+    });
+    select.innerHTML = html;
+}
+
+
+function populateOwnerFilter() {
+
+    var select = document.getElementById("ownerFilter");
+    var currentValue = select.value || "All Owners";
+
+    select.innerHTML = '<option value="All Owners">All Owners</option>';
+
+    ALLOWED_ACCOUNT_OWNERS.forEach(function(name) {
+        var option = document.createElement("option");
+        option.value = name;
+        option.innerText = name;
+        select.appendChild(option);
+    });
+
+    select.value = currentValue;
+    if (select.value !== currentValue) select.value = "All Owners";
+}
+
+
+function isGistHqName(name) {
+    return String(name || "").trim().toLowerCase() === GIST_HQ_OWNER_NAME.toLowerCase();
+}
+
+
+function populateGistOwnerFilter() {
+
+    var group = document.getElementById("gistFilterGroup");
+    var select = document.getElementById("gistOwnerFilter");
+    var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
+    var showGist = isGistHqName(selectedOwner);
+    var previous = select.value;
+
+    group.classList.toggle("hidden", !showGist);
+
+    var values = liveResolved ? liveResolved.gistValues : [];
+    var html = '<option value="' + GIST_ACCOUNT_OWNER_DEFAULT + '">All Gist Account Owners</option>';
+
+    if (!liveResolved) {
+        html += '<option disabled>Loading names...</option>';
+    } else if (values.length === 0) {
+        html += '<option disabled>No Gist Account Owner values found</option>';
+    }
+
+    values.forEach(function(name) {
+        html += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+    });
+
+    select.innerHTML = html;
+    select.value = (showGist && values.indexOf(previous) !== -1) ? previous : GIST_ACCOUNT_OWNER_DEFAULT;
+}
+
+
+function currentGistSelection() {
+    var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
+    if (!isGistHqName(selectedOwner)) return GIST_ACCOUNT_OWNER_DEFAULT;
+    return document.getElementById("gistOwnerFilter").value || GIST_ACCOUNT_OWNER_DEFAULT;
+}
+
+
+function currentQuarterSelection() {
+    return document.getElementById("quarterFilter").value || ALL_QUARTERS;
+}
+
+
+function periodLabel(selectedQuarter) {
+    if (!selectedQuarter || selectedQuarter === ALL_QUARTERS) return FY_LONG_LABEL;
+    return FY_LONG_LABEL + ", " + selectedQuarter + " (" + QUARTER_INFO[selectedQuarter].range + ")";
+}
+
+
+/* =========================================================
+   LOAD CACHED REPORT (writer output)
+   ========================================================= */
 
 function loadReport() {
 
@@ -396,6 +523,11 @@ function loadReport() {
     button.disabled = true;
     button.innerText = "Loading...";
     content.innerHTML = '<div class="loading">Loading dashboard from Zoho CRM...</div>';
+
+    liveDataPromise = null;
+    liveResolved = null;
+    callsCache = {};
+    loadLiveData().catch(function() {});
 
     ZOHO.CRM.FUNCTIONS.execute("Mgmt_dashboard_reader", { "arguments": JSON.stringify({}) })
 
@@ -415,11 +547,9 @@ function loadReport() {
 
             lastReportData = data;
             populateOwnerFilter();
-            populateGistOwnerFilter();
             renderAll();
 
             document.getElementById("lastUpdated").innerText = "Last Updated: " + (data.generated_time || "-");
-
         })
 
         .catch(function(error) {
@@ -431,7 +561,6 @@ function loadReport() {
             button.disabled = false;
             button.innerText = "Refresh";
         });
-
 }
 
 
@@ -471,256 +600,317 @@ function findPayload(response, depth) {
 }
 
 
-function populateOwnerFilter() {
-
-    var select = document.getElementById("ownerFilter");
-    var currentValue = select.value || "All Owners";
-
-    select.innerHTML = '<option value="All Owners">All Owners</option>';
-
-    ALLOWED_ACCOUNT_OWNERS.forEach(function(name) {
-        var option = document.createElement("option");
-        option.value = name;
-        option.innerText = name;
-        select.appendChild(option);
-    });
-
-    select.value = currentValue;
-    if (select.value !== currentValue) select.value = "All Owners";
-
-}
-
-
-function populateGistOwnerFilter() {
-
-    var ownerSelect = document.getElementById("ownerFilter");
-    var select = document.getElementById("gistOwnerFilter");
-    var selectedOwner = ownerSelect.value || "All Owners";
-
-    select.innerHTML = '<option value="' + GIST_ACCOUNT_OWNER_DEFAULT + '">' +
-        GIST_ACCOUNT_OWNER_DEFAULT + '</option>';
-
-    var names = [];
-    var candidates = [];
-    var report = lastReportData || {};
-    var gistOwnerData = (report.per_owner && report.per_owner["GIST HQ"]) || {};
-
-    candidates = candidates.concat(
-        report.gist_account_owner_names || [],
-        report.gist_owner_names || [],
-        gistOwnerData.gist_account_owner_names || [],
-        gistOwnerData.gist_owner_names || []
-    );
-
-    [
-        report.gist_account_owners,
-        gistOwnerData.gist_account_owners
-    ].forEach(function(value) {
-        if (Array.isArray(value)) {
-            candidates = candidates.concat(value);
-        } else if (value && typeof value === "object") {
-            candidates = candidates.concat(Object.keys(value));
-        }
-    });
-
-    candidates.forEach(function(value) {
-        var name = typeof value === "object"
-            ? (value.name || value.label || value.owner_name)
-            : value;
-        if (name && names.indexOf(String(name)) === -1) names.push(String(name));
-    });
-
-    names.sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
-    names.forEach(function(name) {
-        var option = document.createElement("option");
-        option.value = name;
-        option.innerText = name;
-        select.appendChild(option);
-    });
-
-    select.classList.toggle("visible", selectedOwner === "GIST HQ");
-    if (selectedOwner !== "GIST HQ") select.value = GIST_ACCOUNT_OWNER_DEFAULT;
-}
-
-
-function amountCell(bucket, category) {
-    if (!bucket) bucket = { amount_lakh: 0, count: 0 };
-    var clickableClass = category ? " clickable" : "";
-    var dataAttr = category ? ' data-cat="' + category + '"' : "";
-    return '<td class="amount-cell' + clickableClass + '"' + dataAttr + '><span class="big">' + bucket.amount_lakh.toFixed(2) + ' L</span>' +
-        '<span class="small">' + bucket.count + ' deals</span></td>';
-}
-
-
-function renderAll() {
-
-    if (!lastReportData) return;
-
-    var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
-    populateGistOwnerFilter();
-    var selectedGistOwner = document.getElementById("gistOwnerFilter").value || GIST_ACCOUNT_OWNER_DEFAULT;
-    var selectedQuarter = document.getElementById("quarterFilter").value || "All Quarters";
-    var owner = lastReportData.per_owner[selectedOwner];
-
-    if (!owner) {
-        document.getElementById("content").innerHTML = '<div class="error">No data for this owner.</div>';
-        return;
-    }
-
-    var html = "";
-
-    // ---- Summary cards ----
-
-    var achievedCount = typeof owner.closed_won_count === "number"
-        ? owner.closed_won_count
-        : (owner.payment_received_count || 0) + (owner.payment_pending_count || 0);
-
-    html += '<div class="card-row">';
-    html += cardHtml("Target", owner.target_lakhs.toFixed(2) + " L", "target", null);
-    html += cardHtml("Achieved (Closed Won)", achievedCount, "achieved", "achieved");
-    html += cardHtml("Payment Received", owner.payment_received_count, "achieved", "payment_received");
-    html += cardHtml("Payment Pending / Pipeline", owner.payment_pending_count, "pending", "payment_pending");
-    html += '</div>';
-
-    html += '<div class="card-row">';
-    html += cardHtml("Total Accounts", owner.total_accounts, "", "total_accounts");
-    html += cardHtml("Untouched Accounts", owner.untouched, "pending", "untouched");
-    html += cardHtml("Touched", owner.touched, "achieved", "touched");
-    html += cardHtml("Current Pipeline", owner.current_pipeline_count, "pending", "current_pipeline");
-    html += '</div>';
-
-    // ---- Bucket-wise activity ----
-
-    html += '<div class="section"><h2>Bucket-wise Activity</h2>';
-    html += renderBucketTable(owner.bucket_summary);
-    html += '</div>';
-
-    // ---- Expected business by Quarter and Plan (table, clickable) ----
-
-    html += '<div class="section"><h2>Expected Business This FY (Quarter &times; Plan)</h2>';
-    html += '<div id="expectedBusinessSummary" class="pipeline-summary"></div>';
-    html += '<div class="chart-canvas-wrap"><div class="loading">Loading expected business table...</div></div>';
-    html += '</div>';
-
-    // ---- Stage-wise expected business (funnel) ----
-
-    html += '<div class="section"><h2>Stage-wise Expected Business</h2>';
-    html += renderFunnel(owner.stage_business);
-    html += '</div>';
-
-    document.getElementById("content").innerHTML = html;
-
-    attachDrilldownHandlers(owner.owner_id, selectedOwner);
-
-    var myRenderToken = ++renderToken;
-
-    renderStackedQuarterPlanChart(owner.owner_id, selectedOwner, selectedGistOwner, selectedQuarter, myRenderToken)
-
-        .catch(function(err) {
-
-            if (myRenderToken !== renderToken) return;
-
-            var wrap = document.querySelector(".chart-canvas-wrap");
-            if (wrap) wrap.innerHTML = '<div class="error">Could not load expected business table.</div>';
-            console.error("Expected business table error:", err);
-        });
-
-    updateAccountOwnerSummaryDisplay();
-
-}
-
-
-function updateAccountOwnerSummaryDisplay() {
-
-    if (!lastAccountOwnerSummaryData) return;
-
-    var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
-    renderAccountOwnerSummary(lastAccountOwnerSummaryData, selectedOwner);
-
-}
-
-
-function cardHtml(title, value, colorClass, category) {
-
-    var clickableClass = category ? " clickable" : "";
-    var dataAttr = category ? ' data-cat="' + category + '"' : "";
-
-    return '<div class="card"><div class="card-title">' + escapeHtml(title) + '</div>' +
-        '<div class="card-value ' + colorClass + clickableClass + '"' + dataAttr + '>' + value + '</div></div>';
-}
-
-
-function renderBucketTable(bucketSummary) {
-
-    var buckets = Object.keys(bucketSummary || {}).sort(function(a, b) {
-        return a.toLowerCase().localeCompare(b.toLowerCase());
-    });
-
-    var html = '<table><thead><tr><th style="text-align:left;">Bucket</th>' +
-        '<th>Total</th><th>Last 30 Days</th><th>31-60 Days</th><th>60+ Days</th><th>Non-Touched</th></tr></thead><tbody>';
-
-    var grand = { Total: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, non_touched: 0 };
-
-    function bucketCell(count, category) {
-        if (count && count > 0) {
-            return '<td class="clickable" data-cat="' + category + '">' + count + '</td>';
-        }
-        return '<td>' + count + '</td>';
-    }
-
-    buckets.forEach(function(bucket) {
-
-        var row = bucketSummary[bucket];
-
-        html += '<tr><td class="row-label">' + escapeHtml(bucket) + '</td>';
-        html += bucketCell(row.Total, "bucket:" + bucket + ":Total");
-        html += bucketCell(row.last_30, "bucket:" + bucket + ":last_30");
-        html += bucketCell(row.days_31_60, "bucket:" + bucket + ":days_31_60");
-        html += bucketCell(row.days_60_plus, "bucket:" + bucket + ":days_60_plus");
-        html += bucketCell(row.non_touched, "bucket:" + bucket + ":non_touched");
-        html += '</tr>';
-
-        grand.Total += row.Total;
-        grand.last_30 += row.last_30;
-        grand.days_31_60 += row.days_31_60;
-        grand.days_60_plus += row.days_60_plus;
-        grand.non_touched += row.non_touched;
-
-    });
-
-    html += '<tr class="grand-total"><td class="row-label">Grand Total</td>' +
-        '<td>' + grand.Total + '</td><td>' + grand.last_30 + '</td>' +
-        '<td>' + grand.days_31_60 + '</td><td>' + grand.days_60_plus + '</td>' +
-        '<td>' + grand.non_touched + '</td></tr>';
-
-    html += '</tbody></table>';
-
-    if (buckets.length === 0) return '<div class="loading">No bucket data.</div>';
-
-    return html;
-
-}
-
-
 /* =========================================================
-   STACKED QUARTER x PLAN CHART
-   Computed client-side from live Deals data (same pattern as
-   the drilldown queries below) because the server payload only
-   carries separate quarter totals and plan totals, not the
-   quarter-by-plan breakdown needed for a single stacked chart.
+   LIVE DEALS + ACCOUNTS
+   Loaded once and reused by every section and drilldown until
+   Refresh is clicked.
    ========================================================= */
 
-function planColor(plan, index) {
-    if (PLAN_COLORS[plan]) return PLAN_COLORS[plan];
-    return EXTRA_PLAN_COLORS[index % EXTRA_PLAN_COLORS.length];
+function loadLiveData() {
+
+    if (!liveDataPromise) {
+
+        liveDataPromise = Promise.all([
+            getFieldsSafe("Deals"),
+            getFieldsSafe("Accounts"),
+            zohoSearchAll("Deals", null),
+            zohoSearchAll("Accounts", null)
+        ]).then(function(results) {
+            liveResolved = buildLiveData(results[0], results[1], results[2] || [], results[3] || []);
+            return liveResolved;
+        });
+
+        liveDataPromise.catch(function() { liveDataPromise = null; });
+    }
+
+    return liveDataPromise;
 }
 
 
-async function getAllDealsCached() {
-    if (!allDealsCache) {
-        allDealsCache = await zohoSearchAll("Deals", null);
+function getFieldsSafe(entity) {
+    try {
+        if (!ZOHO.CRM.META || !ZOHO.CRM.META.getFields) return Promise.resolve([]);
+        return ZOHO.CRM.META.getFields({ Entity: entity })
+            .then(function(response) {
+                var fields = response && (response.fields || response.data);
+                return Array.isArray(fields) ? fields : [];
+            })
+            .catch(function() { return []; });
+    } catch (e) {
+        return Promise.resolve([]);
     }
-    return allDealsCache;
+}
+
+
+function fieldValueList(value) {
+    if (value === undefined || value === null || value === "") return [];
+    if (Array.isArray(value)) {
+        var out = [];
+        value.forEach(function(v) { out = out.concat(fieldValueList(v)); });
+        return out;
+    }
+    if (typeof value === "object") {
+        var text = value.name || value.display_value || value.value || value.full_name || "";
+        return String(text).trim() ? [String(text).trim()] : [];
+    }
+    var s = String(value).trim();
+    return s ? [s] : [];
+}
+
+
+function fieldValueText(value) {
+    return fieldValueList(value).join(", ");
+}
+
+
+function parseNumber(value) {
+    if (value && typeof value === "object") value = value.value !== undefined ? value.value : value.amount;
+    if (value === undefined || value === null || value === "" || typeof value === "boolean") return 0;
+    var parsed = Number(String(value).replace(/,/g, "").replace(/[₹$\s]|Rs\.?|INR/gi, ""));
+    return isNaN(parsed) ? 0 : parsed;
+}
+
+
+function fieldOptions(meta, records) {
+    var options = [];
+    var seen = {};
+
+    (meta || []).forEach(function(f) {
+        if (!f || !f.api_name || seen[f.api_name]) return;
+        seen[f.api_name] = true;
+        options.push({ api: f.api_name, label: f.field_label || f.api_name, type: String(f.data_type || "").toLowerCase() });
+    });
+
+    (records || []).slice(0, 300).forEach(function(r) {
+        Object.keys(r || {}).forEach(function(k) {
+            if (seen[k]) return;
+            seen[k] = true;
+            options.push({ api: k, label: k, type: "" });
+        });
+    });
+
+    return options;
+}
+
+
+function optionText(o) {
+    return (o.label + " " + o.api.replace(/_/g, " ")).toLowerCase();
+}
+
+
+function describeField(api, options, found) {
+    for (var i = 0; i < options.length; i++) {
+        if (options[i].api === api) return { api: api, label: options[i].label, found: !!found };
+    }
+    return { api: api, label: api, found: !!found };
+}
+
+
+/* Walks tiers in order; within a tier picks the field with the most filled-in values */
+function pickByTiers(options, tiers, scoreFn) {
+    for (var t = 0; t < tiers.length; t++) {
+        var best = null;
+        var bestScore = 0;
+        options.forEach(function(o) {
+            if (!tiers[t](o)) return;
+            var score = scoreFn(o.api);
+            if (score > bestScore) { best = o; bestScore = score; }
+        });
+        if (best) return { api: best.api, label: best.label, found: true };
+    }
+    return null;
+}
+
+
+function countNonEmpty(records, api) {
+    var n = 0;
+    records.forEach(function(r) { if (fieldValueList(r[api]).length) n++; });
+    return n;
+}
+
+
+function countNonZero(records, api) {
+    var n = 0;
+    records.forEach(function(r) { if (parseNumber(r[api]) !== 0) n++; });
+    return n;
+}
+
+
+function chooseYearField(options, deals) {
+    if (DEAL_FIELDS.year) return describeField(DEAL_FIELDS.year, options, true);
+    return pickByTiers(options, [
+        function(o) { return o.api === "Year2"; },
+        function(o) { return /\bdeal year\b|\bfiscal year\b|\bfinancial year\b|\bfy\b/.test(optionText(o)); },
+        function(o) { return /\byear\b/.test(optionText(o)) && o.type !== "date" && o.type !== "datetime"; }
+    ], function(api) { return countNonEmpty(deals, api); }) || describeField("Year2", options, false);
+}
+
+
+var NOT_AMOUNT_WORDS = /probab|percent|discount|tax|qty|quantity|days|score|phone|mobile|pin ?code|zip|year|count|rating|number of|no of|exchange rate|\bid\b/;
+
+function isAmountLike(o) {
+    var numericTypes = ["currency", "double", "integer", "bigint", "formula", "decimal", "long", ""];
+    return numericTypes.indexOf(o.type) !== -1 && !NOT_AMOUNT_WORDS.test(optionText(o));
+}
+
+
+function chooseAmountField(options, deals) {
+    if (DEAL_FIELDS.amount) return describeField(DEAL_FIELDS.amount, options, true);
+    return pickByTiers(options, [
+        function(o) { return isAmountLike(o) && /expected business/.test(optionText(o)); },
+        function(o) { return o.api === "Amount"; },
+        function(o) { return isAmountLike(o) && /business|lakh/.test(optionText(o)); },
+        function(o) { return isAmountLike(o) && /expected|amount|value|revenue|total|price|deal size/.test(optionText(o)); }
+    ], function(api) { return countNonZero(deals, api); }) || describeField("Amount", options, false);
+}
+
+
+function choosePlanField(options, deals) {
+    if (DEAL_FIELDS.plan) return describeField(DEAL_FIELDS.plan, options, true);
+    return pickByTiers(options, [
+        function(o) { return o.api === "Deal_Category"; },
+        function(o) { return /\bplan\b/.test(optionText(o)); },
+        function(o) { return /categor/.test(optionText(o)); }
+    ], function(api) { return countNonEmpty(deals, api); }) || describeField("Deal_Category", options, false);
+}
+
+
+function chooseGistField(options, accounts) {
+    if (ACCOUNT_GIST_FIELD) return describeField(ACCOUNT_GIST_FIELD, options, true);
+    return pickByTiers(options, [
+        function(o) { return /gist.*account.*owner/.test(optionText(o)); },
+        function(o) { return /gist.*owner/.test(optionText(o)); },
+        function(o) { return /gist/.test(optionText(o)) && !/bucket/.test(optionText(o)); }
+    ], function(api) { return countNonEmpty(accounts, api); }) || describeField("GIST_Account_Owner", options, false);
+}
+
+
+function buildLiveData(dealMeta, accountMeta, deals, accounts) {
+
+    var dealOptions = fieldOptions(dealMeta, deals);
+    var accountOptions = fieldOptions(accountMeta, accounts);
+
+    fieldInfo = { closingDate: DEAL_FIELDS.closingDate || "Closing_Date" };
+    fieldInfo.year = chooseYearField(dealOptions, deals);
+
+    var fyDeals = deals.filter(function(d) { return dealFiscalYear(d) === FY_FILTER; });
+    var scope = fyDeals.length ? fyDeals : deals;
+
+    fieldInfo.amount = chooseAmountField(dealOptions, scope);
+    fieldInfo.plan = choosePlanField(dealOptions, scope);
+
+    var gistHqAccounts = accounts.filter(function(a) { return isGistHqName(ddLookupName(a.Owner, "")); });
+    fieldInfo.gist = chooseGistField(accountOptions, gistHqAccounts.length ? gistHqAccounts : accounts);
+
+    amountUnitInUse = decideAmountUnit(scope);
+
+    var accountsById = {};
+    var ownerIdByName = {};
+    var gistSet = {};
+    var gistHasEmpty = false;
+
+    accounts.forEach(function(a) {
+
+        if (!a.id) return;
+
+        var ownerName = ddLookupName(a.Owner, "Unassigned");
+        var ownerId = ddLookupId(a.Owner);
+        var gistNames = fieldValueList(a[fieldInfo.gist.api]);
+
+        accountsById[String(a.id)] = {
+            id: String(a.id),
+            name: a.Account_Name || "(Unnamed Account)",
+            ownerId: ownerId,
+            ownerName: ownerName,
+            bucket: fieldValueText(a.Bucket_Type) || "No Bucket",
+            gistNames: gistNames
+        };
+
+        if (ownerId) ownerIdByName[ownerName.trim().toLowerCase()] = ownerId;
+
+        if (isGistHqName(ownerName)) {
+            if (gistNames.length === 0) gistHasEmpty = true;
+            gistNames.forEach(function(n) { gistSet[n] = true; });
+        }
+    });
+
+    var gistValues = Object.keys(gistSet).sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
+    if (gistHasEmpty) gistValues.push(GIST_NOT_ASSIGNED);
+
+    var outsideWindow = fyDeals.filter(function(d) {
+        return !isInFyWindow(ddParseDate(d[fieldInfo.closingDate]));
+    }).length;
+
+    return {
+        deals: deals,
+        accountsById: accountsById,
+        ownerIdByName: ownerIdByName,
+        gistValues: gistValues,
+        gistHqAccountCount: gistHqAccounts.length,
+        fyDealCount: fyDeals.length,
+        outsideWindow: outsideWindow
+    };
+}
+
+
+function rawDealAmount(deal) {
+    return parseNumber(deal ? deal[fieldInfo.amount.api] : null);
+}
+
+
+function decideAmountUnit(deals) {
+
+    if (AMOUNT_UNIT === "lakh" || AMOUNT_UNIT === "rupees") return AMOUNT_UNIT;
+    if (/lakh|\blac\b/i.test(fieldInfo.amount.label + " " + fieldInfo.amount.api)) return "lakh";
+
+    var values = [];
+    deals.forEach(function(deal) {
+        var v = Math.abs(rawDealAmount(deal));
+        if (v) values.push(v);
+    });
+
+    if (values.length === 0) return "rupees";
+
+    values.sort(function(a, b) { return a - b; });
+    return values[Math.floor(values.length / 2)] < 1000 ? "lakh" : "rupees";
+}
+
+
+function dealAmountLakh(deal) {
+    var raw = rawDealAmount(deal);
+    return amountUnitInUse === "lakh" ? raw : raw / 100000;
+}
+
+
+function dealPlanName(deal) {
+    return fieldValueText(deal ? deal[fieldInfo.plan.api] : null) || "No Plan";
+}
+
+
+function dealFiscalYear(deal) {
+
+    var value = fieldValueText(deal ? deal[fieldInfo.year.api] : null);
+
+    if (value) {
+        value = value.replace(/^FY\s*/i, "").replace(/\s+/g, "");
+        var full = value.match(/^(\d{4})[-\/](\d{4})$/);
+        if (full) return full[1] + "-" + full[2];
+        var shortEnd = value.match(/^(\d{4})[-\/](\d{2})$/);
+        if (shortEnd) return shortEnd[1] + "-" + (Number(shortEnd[1]) + 1);
+        var bothShort = value.match(/^(\d{2})[-\/](\d{2})$/);
+        if (bothShort) return "20" + bothShort[1] + "-20" + bothShort[2];
+        return value;
+    }
+
+    var date = ddParseDate(deal && deal[fieldInfo.closingDate]);
+    if (!date) return "";
+    var year = date.getFullYear();
+    return (date.getMonth() >= 3) ? (year + "-" + (year + 1)) : ((year - 1) + "-" + year);
+}
+
+
+function isInFyWindow(date) {
+    return !!date && date >= FY_START && date <= FY_END;
 }
 
 
@@ -730,256 +920,881 @@ function isClosedWonStage(stage) {
 
 
 function isCurrentPipelineStage(stage) {
-    var normalizedStage = String(stage || "").trim();
-    return !isClosedWonStage(normalizedStage) && normalizedStage !== "Closed Lost";
+    var normalized = String(stage || "").trim();
+    return !isClosedWonStage(normalized) && normalized !== CLOSED_LOST_STAGE;
 }
 
 
-function accountGistOwnerName(account) {
-    if (!account) return "";
-    var value = account.GIST_Account_Owner ||
-        account.GIST_Account_Owner_Name ||
-        account.Gist_Account_Owner ||
-        account.GIST_Owner;
-    return ddLookupName(value, typeof value === "string" ? value : "");
+function isExcludedTestDeal(deal) {
+    var name = String((deal && deal.Deal_Name) || "").toLowerCase();
+    return EXCLUDED_DEAL_NAME_WORDS.some(function(word) { return name.indexOf(word) !== -1; });
 }
 
 
-function accountMatchesGistOwner(account, gistOwnerName) {
-    return !gistOwnerName ||
-        gistOwnerName === GIST_ACCOUNT_OWNER_DEFAULT ||
-        accountGistOwnerName(account) === gistOwnerName;
+function accountMatchesGist(account, gistSelection) {
+    if (!gistSelection || gistSelection === GIST_ACCOUNT_OWNER_DEFAULT) return true;
+    if (!account) return false;
+    if (gistSelection === GIST_NOT_ASSIGNED) return account.gistNames.length === 0;
+    return account.gistNames.indexOf(gistSelection) !== -1;
 }
 
 
-async function computeQuarterPlanMatrix(ownerId, gistOwnerName, selectedQuarter) {
+/*
+ * Shared per-deal filter (FY, closing-date quarter, Gist account owner).
+ * Cards, charts, summary and every drilldown use it, so numbers and
+ * popup lists always agree. Returns null when the deal is filtered out.
+ */
+function dealContext(deal, live, selectedQuarter, gistSelection) {
 
-    var isAllOwners = !ownerId;
+    if (dealFiscalYear(deal) !== FY_FILTER) return null;
 
-    var accountIdSet = null;
+    var accId = ddLookupId(deal.Account_Name);
+    if (!accId) return null;
 
-    if (!isAllOwners || (gistOwnerName && gistOwnerName !== GIST_ACCOUNT_OWNER_DEFAULT)) {
-        var accountsForOwner = await zohoSearchAll(
-            "Accounts",
-            isAllOwners ? null : "(Owner:equals:" + ownerId + ")"
-        );
-        accountIdSet = {};
-        accountsForOwner.forEach(function(a) {
-            if (!a.id || !accountMatchesGistOwner(a, gistOwnerName)) return;
-            accountIdSet[String(a.id)] = true;
-        });
-    }
+    var closingDate = ddParseDate(deal[fieldInfo.closingDate]);
+    var inWindow = isInFyWindow(closingDate);
+    if (REQUIRE_CLOSING_DATE_IN_FY && !inWindow) return null;
 
-    var allDeals = await getAllDealsCached();
+    var quarter = inWindow ? monthQuarter(closingDate) : null;
+    var allQuarters = !selectedQuarter || selectedQuarter === ALL_QUARTERS;
+    if (!allQuarters && quarter !== selectedQuarter) return null;
 
-    var allQuarters = ["Q1", "Q2", "Q3", "Q4"];
-    var quarters = selectedQuarter && selectedQuarter !== "All Quarters"
-        ? [selectedQuarter]
-        : allQuarters;
-    var matrix = {};
-    quarters.forEach(function(q) { matrix[q] = {}; });
-
-    var planSet = {};
-    var currentPipeline = {};
-    quarters.forEach(function(q) {
-        currentPipeline[q] = { amount_lakh: 0, count: 0 };
-    });
-
-    allDeals.forEach(function(deal) {
-
-        var dealYear = String(deal.Year2 || "").trim();
-        if (dealYear !== "2026-2027") return;
-
-        var accId = ddLookupId(deal.Account_Name);
-        if (!accId) return;
-        if (!isAllOwners && !accountIdSet[accId]) return;
-        if (accountIdSet && !accountIdSet[accId]) return;
-
-        var closingDate = ddParseDate(deal.Closing_Date);
-        var quarter = ddFiscalQuarter(closingDate);
-        if (!quarter) return;
-        if (quarters.indexOf(quarter) === -1) return;
-
-        var plan = deal.Deal_Category || "No Plan";
-        var amount = Number(deal[DEAL_AMOUNT_FIELD] || 0);
-
-        if (!matrix[quarter][plan]) matrix[quarter][plan] = { amount_lakh: 0, count: 0 };
-        matrix[quarter][plan].amount_lakh += amount / 100000;
-        matrix[quarter][plan].count += 1;
-
-        if (isCurrentPipelineStage(deal.Stage)) {
-            currentPipeline[quarter].amount_lakh += amount / 100000;
-            currentPipeline[quarter].count += 1;
-        }
-
-        planSet[plan] = true;
-    });
-
-    var knownOrder = ["Plan A", "Plan B", "Plan C"];
-    var plans = knownOrder.filter(function(p) { return planSet[p]; });
-
-    Object.keys(planSet).sort().forEach(function(p) {
-        if (plans.indexOf(p) === -1) plans.push(p);
-    });
+    var account = live.accountsById[accId] || null;
+    if (!accountMatchesGist(account, gistSelection)) return null;
 
     return {
-        quarters: quarters,
-        plans: plans,
-        matrix: matrix,
-        current_pipeline: currentPipeline
+        accId: accId,
+        account: account,
+        accName: account ? account.name : ddLookupName(deal.Account_Name, "(Unnamed Account)"),
+        quarter: quarter,
+        stage: String(deal.Stage || "").trim() || "Unknown",
+        amount: dealAmountLakh(deal),
+        plan: dealPlanName(deal),
+        dealOwnerId: ddLookupId(deal.Owner),
+        excluded: isExcludedTestDeal(deal)
     };
 }
 
 
-async function renderStackedQuarterPlanChart(ownerId, ownerName, gistOwnerName, selectedQuarter, token) {
+/* Cards: scoped to the DEAL owner (same rule as the writer) */
+function matchesCardCategory(ctx, category, ownerId) {
 
-    var data = await computeQuarterPlanMatrix(ownerId, gistOwnerName, selectedQuarter);
+    if (ownerId && ctx.dealOwnerId !== ownerId) return false;
 
-    if (token !== renderToken) return; // owner switched while loading, discard
+    if (category === "achieved") return isClosedWonStage(ctx.stage) && !ctx.excluded;
+    if (category === "payment_received") return PAYMENT_RECEIVED_STAGES.indexOf(ctx.stage) !== -1 && !ctx.excluded;
+    if (category === "payment_pending") return PAYMENT_PENDING_STAGES.indexOf(ctx.stage) !== -1;
+    if (category === "current_pipeline") {
+        return isCurrentPipelineStage(ctx.stage) && !!ctx.account && ctx.account.ownerId === ctx.dealOwnerId;
+    }
+    return false;
+}
 
-    var quarters = data.quarters;
-    var plans = data.plans;
-    var matrix = data.matrix;
-    var wrap = document.querySelector(".chart-canvas-wrap");
-    var summary = document.getElementById("expectedBusinessSummary");
+
+/* Charts and summary: scoped to the linked ACCOUNT owner */
+function matchesAccountOwner(ctx, ownerId) {
+    return !ownerId || (!!ctx.account && ctx.account.ownerId === ownerId);
+}
+
+
+function countsAsExpected(ctx) {
+    return !(EXCLUDE_LOST_FROM_EXPECTED && ctx.stage === CLOSED_LOST_STAGE);
+}
+
+
+function addAmount(target, key, amount) {
+    if (!target[key]) target[key] = { amount_lakh: 0, count: 0 };
+    target[key].amount_lakh += amount;
+    target[key].count += 1;
+}
+
+
+function computeDealMetrics(live, ownerId, gistSelection, selectedQuarter) {
+
+    var quarters = selectedQuarter && selectedQuarter !== ALL_QUARTERS ? [selectedQuarter] : ["Q1", "Q2", "Q3", "Q4"];
+
+    var m = {
+        quarters: quarters,
+        plans: [],
+        matrix: {},
+        pipelineByQuarter: {},
+        planTotals: {},
+        stageTotals: {},
+        cards: { achieved: 0, payment_received: 0, payment_pending: 0, current_pipeline: 0 },
+        periodDeals: 0,
+        dealsWithAmount: 0,
+        dealsWithPlan: 0
+    };
+
+    quarters.forEach(function(q) {
+        m.matrix[q] = {};
+        m.pipelineByQuarter[q] = { amount_lakh: 0, count: 0 };
+    });
+
+    live.deals.forEach(function(deal) {
+
+        var ctx = dealContext(deal, live, selectedQuarter, gistSelection);
+        if (!ctx) return;
+
+        m.periodDeals++;
+        if (ctx.amount) m.dealsWithAmount++;
+        if (ctx.plan !== "No Plan") m.dealsWithPlan++;
+
+        CARD_CATEGORIES.forEach(function(category) {
+            if (matchesCardCategory(ctx, category, ownerId)) m.cards[category] += ctx.amount;
+        });
+
+        if (!matchesAccountOwner(ctx, ownerId)) return;
+
+        addAmount(m.stageTotals, ctx.stage, ctx.amount);
+
+        if (!ctx.quarter) return;
+
+        if (countsAsExpected(ctx)) {
+            addAmount(m.matrix[ctx.quarter], ctx.plan, ctx.amount);
+            addAmount(m.planTotals, ctx.plan, ctx.amount);
+        }
+
+        if (isCurrentPipelineStage(ctx.stage)) {
+            m.pipelineByQuarter[ctx.quarter].amount_lakh += ctx.amount;
+            m.pipelineByQuarter[ctx.quarter].count += 1;
+        }
+    });
+
+    var known = ["Plan A", "Plan B", "Plan C"];
+    var found = Object.keys(m.planTotals);
+
+    m.plans = known.filter(function(p) { return found.indexOf(p) !== -1; });
+    found.sort().forEach(function(p) {
+        if (m.plans.indexOf(p) === -1 && p !== "No Plan") m.plans.push(p);
+    });
+    if (found.indexOf("No Plan") !== -1) m.plans.push("No Plan");
+
+    return m;
+}
+
+
+function computeWonLostByOwner(live, gistSelection, selectedQuarter) {
+
+    var result = {};
+
+    live.deals.forEach(function(deal) {
+
+        var ctx = dealContext(deal, live, selectedQuarter, gistSelection);
+        if (!ctx || !ctx.account) return;
+
+        var key = ctx.account.ownerName.trim().toLowerCase();
+        if (!result[key]) result[key] = { won: {}, lost: {} };
+
+        if (isClosedWonStage(ctx.stage) && !ctx.excluded) result[key].won[ctx.accId] = true;
+        else if (ctx.stage === CLOSED_LOST_STAGE) result[key].lost[ctx.accId] = true;
+    });
+
+    return result;
+}
+
+
+/* =========================================================
+   ACCOUNT ACTIVITY (live, used when a Gist account owner is chosen)
+   ========================================================= */
+
+function filterAccounts(live, ownerId, gistSelection) {
+    var list = [];
+    Object.keys(live.accountsById).forEach(function(id) {
+        var a = live.accountsById[id];
+        if (ownerId && a.ownerId !== ownerId) return;
+        if (!accountMatchesGist(a, gistSelection)) return;
+        list.push(a);
+    });
+    return list;
+}
+
+
+function getAllCalls() {
+    if (!callsCache.__all__) callsCache.__all__ = zohoSearchAll("Calls", null);
+    return callsCache.__all__;
+}
+
+
+function getOwnerCalls(ownerId) {
+
+    if (!ownerId) return getAllCalls();
+
+    if (!callsCache[ownerId]) {
+        callsCache[ownerId] = zohoSearchAll("Calls", "(Owner:equals:" + ownerId + ")").then(function(calls) {
+            // Zoho search stops at 2,000 results; fall back to the full list if we hit that
+            if (calls.length >= 2000) {
+                return getAllCalls().then(function(all) {
+                    return all.filter(function(c) { return ddLookupId(c.Owner) === ownerId; });
+                });
+            }
+            return calls;
+        });
+    }
+
+    return callsCache[ownerId];
+}
+
+
+function latestOwnerCalls(accounts, calls) {
+
+    var byId = {};
+    accounts.forEach(function(a) { byId[a.id] = a; });
+
+    var latest = {};
+
+    calls.forEach(function(call) {
+        var whatId = ddLookupId(call.What_Id);
+        var account = byId[whatId];
+        if (!account) return;
+        if (ddLookupId(call.Owner) !== account.ownerId) return;
+        var date = ddParseDate(call.Call_Start_Time);
+        if (!date) return;
+        if (!latest[whatId] || date > latest[whatId]) latest[whatId] = date;
+    });
+
+    return latest;
+}
+
+
+function agingOf(date) {
+    var days = Math.floor((new Date() - date) / 86400000);
+    if (days <= 30) return "last_30";
+    if (days <= 60) return "days_31_60";
+    return "days_60_plus";
+}
+
+
+function computeAccountStats(accounts, calls) {
+
+    var latest = latestOwnerCalls(accounts, calls);
+    var stats = { total: 0, touched: 0, untouched: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, bucket_summary: {} };
+
+    accounts.forEach(function(a) {
+
+        stats.total++;
+
+        if (!stats.bucket_summary[a.bucket]) {
+            stats.bucket_summary[a.bucket] = { Total: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, non_touched: 0 };
+        }
+
+        var bs = stats.bucket_summary[a.bucket];
+        bs.Total++;
+
+        var lastCall = latest[a.id];
+
+        if (!lastCall) {
+            stats.untouched++;
+            bs.non_touched++;
+        } else {
+            var age = agingOf(lastCall);
+            stats.touched++;
+            stats[age]++;
+            bs[age]++;
+        }
+    });
+
+    return stats;
+}
+
+
+/* =========================================================
+   RENDER
+   ========================================================= */
+
+function resolveOwnerId(ownerName, live) {
+    if (!ownerName || ownerName === "All Owners") return null;
+    var cached = lastReportData && lastReportData.per_owner && lastReportData.per_owner[ownerName];
+    if (cached && cached.owner_id) return String(cached.owner_id);
+    if (live) return live.ownerIdByName[ownerName.trim().toLowerCase()];
+    return undefined;
+}
+
+
+function renderAll() {
+
+    if (!lastReportData || !lastReportData.per_owner) return;
+
+    var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
+    var selectedQuarter = currentQuarterSelection();
+
+    populateGistOwnerFilter();
+
+    var gistSelection = currentGistSelection();
+    var gistActive = gistSelection !== GIST_ACCOUNT_OWNER_DEFAULT;
+    var ownerCache = lastReportData.per_owner[selectedOwner] || {};
+    var period = periodLabel(selectedQuarter);
+
+    aorLive = null;
+    updateSummaryTitle(selectedQuarter, gistSelection);
+
+    var html = "";
+
+    html += '<div class="card-row">';
+    html += cardHtml("Target (full FY)", Number(ownerCache.target_lakhs || 0).toFixed(2) + " L", "target", null);
+    html += cardHtml("Achieved (Closed Won)", "Calculating...", "achieved waiting", "achieved");
+    html += cardHtml("Payment Received", "Calculating...", "achieved waiting", "payment_received");
+    html += cardHtml("Payment Pending / Pipeline", "Calculating...", "pending waiting", "payment_pending");
+    html += '</div>';
+
+    html += '<div class="card-row">';
+    html += cardHtml("Total Accounts", gistActive ? "Calculating..." : (ownerCache.total_accounts || 0),
+        gistActive ? "waiting" : "", "total_accounts");
+    html += cardHtml("Untouched Accounts", gistActive ? "Calculating..." : (ownerCache.untouched || 0),
+        gistActive ? "pending waiting" : "pending", "untouched");
+    html += cardHtml("Touched", gistActive ? "Calculating..." : (ownerCache.touched || 0),
+        gistActive ? "achieved waiting" : "achieved", "touched");
+    html += cardHtml("Current Pipeline", "Calculating...", "pending waiting", "current_pipeline");
+    html += '</div>';
+
+    html += '<div class="section"><h2>Bucket-wise Activity</h2>';
+    html += '<p class="section-note">Account activity is measured from today, so the quarter filter does not change it.</p>';
+    html += '<div id="bucketWrap">' +
+        (gistActive ? '<div class="loading">Calculating activity for the selected Gist account owner...</div>'
+                    : renderBucketTable(ownerCache.bucket_summary)) + '</div>';
+    html += '</div>';
+
+    html += '<div class="section"><h2>Expected Business, ' + escapeHtml(period) + ' (Quarter &times; Plan)</h2>';
+    html += '<div id="expectedBusinessWrap"><div class="loading">Loading deals...</div></div>';
+    html += '</div>';
+
+    html += '<div class="section"><h2>Stage-wise Expected Business, ' + escapeHtml(period) + '</h2>';
+    html += '<div id="stageFunnelWrap"><div class="loading">Loading deals...</div></div>';
+    html += '</div>';
+
+    document.getElementById("content").innerHTML = html;
+    updateAccountOwnerSummaryDisplay();
+
+    var myToken = ++renderToken;
+
+    loadLiveData()
+
+        .then(async function(live) {
+
+            if (myToken !== renderToken) return;
+
+            // Gist names become available once accounts are loaded
+            populateGistOwnerFilter();
+
+            var ownerId = resolveOwnerId(selectedOwner, live);
+
+            if (ownerId === undefined) {
+                showLiveError("No accounts are owned by " + selectedOwner + ". Check that the name matches Zoho exactly.");
+                return;
+            }
+
+            var metrics = computeDealMetrics(live, ownerId, gistSelection, selectedQuarter);
+
+            updateAmountCards(metrics.cards);
+            renderExpectedBusiness(metrics, live);
+            renderStageFunnel(metrics);
+
+            aorLive = {
+                wonLost: computeWonLostByOwner(live, gistSelection, selectedQuarter),
+                gistActive: gistActive,
+                gistStats: null
+            };
+            updateAccountOwnerSummaryDisplay();
+            attachDrilldownHandlers(ownerId, selectedOwner);
+
+            if (!gistActive) return;
+
+            var accounts = filterAccounts(live, ownerId, gistSelection);
+            var calls = await getOwnerCalls(ownerId);
+
+            if (myToken !== renderToken) return;
+
+            var stats = computeAccountStats(accounts, calls);
+
+            setCardValue("total_accounts", stats.total);
+            setCardValue("untouched", stats.untouched);
+            setCardValue("touched", stats.touched);
+
+            var bucketWrap = document.getElementById("bucketWrap");
+            if (bucketWrap) bucketWrap.innerHTML = renderBucketTable(stats.bucket_summary);
+
+            aorLive.gistStats = stats;
+            updateAccountOwnerSummaryDisplay();
+            attachDrilldownHandlers(ownerId, selectedOwner);
+        })
+
+        .catch(function(err) {
+            if (myToken !== renderToken) return;
+            console.error("Live data error:", err);
+            showLiveError("Could not load Deals and Accounts from Zoho CRM. Click Refresh to try again.");
+        });
+}
+
+
+function showLiveError(message) {
+    var html = '<div class="error">' + escapeHtml(message) + '</div>';
+    ["expectedBusinessWrap", "stageFunnelWrap"].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+    });
+    CARD_CATEGORIES.concat(["total_accounts", "untouched", "touched"]).forEach(function(cat) {
+        var el = document.getElementById("card-" + cat);
+        if (el && el.classList.contains("waiting")) setCardValue(cat, "—");
+    });
+}
+
+
+function updateSummaryTitle(selectedQuarter, gistSelection) {
+    var title = "Account Owner Summary (" + periodLabel(selectedQuarter);
+    if (gistSelection && gistSelection !== GIST_ACCOUNT_OWNER_DEFAULT) title += ", Gist account owner: " + gistSelection;
+    document.getElementById("aorTitle").innerText = title + ")";
+}
+
+
+function updateAccountOwnerSummaryDisplay() {
+    if (!lastAccountOwnerSummaryData) return;
+    var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
+    renderAccountOwnerSummary(lastAccountOwnerSummaryData, selectedOwner);
+}
+
+
+function cardHtml(title, value, colorClass, category) {
+    var clickableClass = category ? " clickable" : "";
+    var dataAttr = category ? ' data-cat="' + category + '"' : "";
+    var idAttr = category ? ' id="card-' + category + '"' : "";
+    return '<div class="card"><div class="card-title">' + escapeHtml(title) + '</div>' +
+        '<div class="card-value ' + colorClass + clickableClass + '"' + idAttr + dataAttr + '>' + value + '</div></div>';
+}
+
+
+function setCardValue(category, value) {
+    var el = document.getElementById("card-" + category);
+    if (!el) return;
+    el.innerText = value;
+    el.classList.remove("waiting");
+}
+
+
+function formatLakh(value) {
+    var number = Number(value);
+    if (isNaN(number)) number = 0;
+    return number.toFixed(2) + " L";
+}
+
+
+function updateAmountCards(cards) {
+    CARD_CATEGORIES.forEach(function(category) {
+        setCardValue(category, formatLakh(cards[category]));
+    });
+}
+
+
+function renderBucketTable(bucketSummary) {
+
+    var buckets = Object.keys(bucketSummary || {}).sort(function(a, b) {
+        return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    if (buckets.length === 0) return '<div class="loading">No accounts for the selected filters.</div>';
+
+    var html = '<div class="table-scroll"><table><thead><tr><th style="text-align:left;">Bucket</th>' +
+        '<th>Total</th><th>Last 30 Days</th><th>31-60 Days</th><th>60+ Days</th><th>Non-Touched</th></tr></thead><tbody>';
+
+    var grand = { Total: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, non_touched: 0 };
+
+    function bucketCell(count, category) {
+        if (count && count > 0) {
+            return '<td class="clickable plain" data-cat="' + escapeHtml(category) + '">' + count + '</td>';
+        }
+        return '<td>' + (count || 0) + '</td>';
+    }
+
+    buckets.forEach(function(bucket) {
+
+        var row = bucketSummary[bucket];
+        var prefix = "bucket:" + encodeURIComponent(bucket) + ":";
+
+        html += '<tr><td class="row-label">' + escapeHtml(bucket) + '</td>';
+        html += bucketCell(row.Total, prefix + "Total");
+        html += bucketCell(row.last_30, prefix + "last_30");
+        html += bucketCell(row.days_31_60, prefix + "days_31_60");
+        html += bucketCell(row.days_60_plus, prefix + "days_60_plus");
+        html += bucketCell(row.non_touched, prefix + "non_touched");
+        html += '</tr>';
+
+        Object.keys(grand).forEach(function(key) { grand[key] += Number(row[key] || 0); });
+    });
+
+    html += '<tr class="grand-total"><td class="row-label">Grand Total</td>' +
+        '<td>' + grand.Total + '</td><td>' + grand.last_30 + '</td>' +
+        '<td>' + grand.days_31_60 + '</td><td>' + grand.days_60_plus + '</td>' +
+        '<td>' + grand.non_touched + '</td></tr>';
+
+    html += '</tbody></table></div>';
+
+    return html;
+}
+
+
+function planColor(plan, index) {
+    if (PLAN_COLORS[plan]) return PLAN_COLORS[plan];
+    return EXTRA_PLAN_COLORS[index % EXTRA_PLAN_COLORS.length];
+}
+
+
+function lakhCell(bucket, category, extraClass) {
+
+    var amount = Number((bucket && bucket.amount_lakh) || 0);
+    var count = Number((bucket && bucket.count) || 0);
+    var classes = "amount-cell" + (extraClass ? " " + extraClass : "") +
+        (count && category ? " clickable" : "") + (!count ? " zero" : "");
+    var dataAttr = count && category ? ' data-cat="' + escapeHtml(category) + '"' : "";
+
+    return '<td class="' + classes + '"' + dataAttr + '>' +
+        '<span class="big">' + amount.toFixed(2) + ' L</span>' +
+        '<span class="small">' + count + (count === 1 ? ' deal' : ' deals') + '</span></td>';
+}
+
+
+function renderExpectedBusiness(m, live) {
+
+    var wrap = document.getElementById("expectedBusinessWrap");
     if (!wrap) return;
 
-    if (plans.length === 0) {
-        wrap.innerHTML = '<div class="loading">No expected business data for the selected quarter.</div>';
-        if (summary) summary.innerHTML = "";
+    var notes = dataSourceNotes(m, live);
+
+    if (m.plans.length === 0) {
+        wrap.innerHTML = '<div class="loading">No expected business deals for the selected filters.</div>' + notes;
         return;
     }
 
-    var html = '<table class="expected-business-table"><thead><tr>';
+    var grandExpected = { amount_lakh: 0, count: 0 };
+    m.plans.forEach(function(plan) {
+        grandExpected.amount_lakh += m.planTotals[plan].amount_lakh;
+        grandExpected.count += m.planTotals[plan].count;
+    });
+
+    var grandPipeline = { amount_lakh: 0, count: 0 };
+    m.quarters.forEach(function(q) {
+        grandPipeline.amount_lakh += m.pipelineByQuarter[q].amount_lakh;
+        grandPipeline.count += m.pipelineByQuarter[q].count;
+    });
+
+    var html = '<div class="eb-summary">';
+
+    html += '<div class="eb-tile" style="border-left-color:#1457b8;"><span class="label">Expected Business</span>' +
+        '<span class="value">' + formatLakh(grandExpected.amount_lakh) + '</span>' +
+        '<span class="sub">' + grandExpected.count + ' deals</span></div>';
+
+    html += '<div class="eb-tile" style="border-left-color:#d97706;"><span class="label">Current Pipeline</span>' +
+        '<span class="value">' + formatLakh(grandPipeline.amount_lakh) + '</span>' +
+        '<span class="sub">' + grandPipeline.count + ' open deals</span></div>';
+
+    m.plans.forEach(function(plan, i) {
+        var total = m.planTotals[plan];
+        var share = grandExpected.amount_lakh ? Math.round((total.amount_lakh / grandExpected.amount_lakh) * 100) : 0;
+        html += '<div class="eb-tile" style="border-left-color:' + planColor(plan, i) + ';">' +
+            '<span class="label">' + escapeHtml(plan) + '</span>' +
+            '<span class="value">' + formatLakh(total.amount_lakh) + '</span>' +
+            '<span class="sub">' + total.count + ' deals, ' + share + '% of total</span></div>';
+    });
+
+    html += '</div>';
+
+    html += '<div class="table-scroll"><table class="eb-table"><thead><tr>';
     html += '<th style="text-align:left;">Quarter</th>';
-    plans.forEach(function(plan) { html += '<th>' + escapeHtml(plan) + '</th>'; });
-    html += '<th>Expected Business</th><th>Current Pipeline</th></tr></thead><tbody>';
+    m.plans.forEach(function(plan, i) {
+        html += '<th><span class="plan-dot" style="background:' + planColor(plan, i) + ';"></span>' + escapeHtml(plan) + '</th>';
+    });
+    html += '<th>Total Expected</th><th>Current Pipeline</th><th class="mix-col">Plan Mix</th></tr></thead><tbody>';
 
-    var grandExpected = 0;
-    var grandPipeline = 0;
-    var grandPipelineCount = 0;
+    m.quarters.forEach(function(quarter) {
 
-    quarters.forEach(function(quarter) {
-        var quarterExpected = 0;
-        html += '<tr><td class="row-label">FY 26-27 ' + quarter + '</td>';
-
-        plans.forEach(function(plan) {
-            var cell = matrix[quarter][plan] || { amount_lakh: 0, count: 0 };
-            quarterExpected += Number(cell.amount_lakh || 0);
-            html += '<td class="amount-cell' + (cell.count ? ' clickable' : '') +
-                '" data-cat="qp:' + escapeHtml(quarter) + ':' + escapeHtml(plan) + '">' +
-                '<span class="big">' + Number(cell.amount_lakh || 0).toFixed(2) + ' L</span>' +
-                '<span class="small">' + (cell.count || 0) + ' deals</span></td>';
+        var rowTotal = { amount_lakh: 0, count: 0 };
+        m.plans.forEach(function(plan) {
+            var cell = m.matrix[quarter][plan];
+            if (!cell) return;
+            rowTotal.amount_lakh += cell.amount_lakh;
+            rowTotal.count += cell.count;
         });
 
-        var pipeline = data.current_pipeline[quarter] || { amount_lakh: 0, count: 0 };
-        html += '<td class="amount-cell expected-business-total"><span class="big">' +
-            quarterExpected.toFixed(2) + ' L</span><span class="small">Expected Business</span></td>';
-        html += '<td class="amount-cell' + (pipeline.count ? ' clickable' : '') +
-            '" data-cat="quarter_pipeline:' + escapeHtml(quarter) + '">' +
-            '<span class="big">' + Number(pipeline.amount_lakh || 0).toFixed(2) + ' L</span>' +
-            '<span class="small">' + (pipeline.count || 0) + ' deals</span></td></tr>';
+        html += '<tr><td class="row-label">' + quarter + '<span class="sub">' + QUARTER_INFO[quarter].range + '</span></td>';
 
-        grandExpected += quarterExpected;
-        grandPipeline += Number(pipeline.amount_lakh || 0);
-        grandPipelineCount += Number(pipeline.count || 0);
+        m.plans.forEach(function(plan) {
+            html += lakhCell(m.matrix[quarter][plan], "qp:" + encodeURIComponent(quarter) + ":" + encodeURIComponent(plan));
+        });
+
+        html += lakhCell(rowTotal, null, "total-col");
+        html += lakhCell(m.pipelineByQuarter[quarter], "quarter_pipeline:" + encodeURIComponent(quarter));
+
+        html += '<td class="mix-col"><div class="mix-bar">';
+        m.plans.forEach(function(plan, i) {
+            var cell = m.matrix[quarter][plan];
+            if (!cell || !rowTotal.amount_lakh || cell.amount_lakh <= 0) return;
+            var pct = (cell.amount_lakh / rowTotal.amount_lakh) * 100;
+            html += '<span style="width:' + pct.toFixed(1) + '%;background:' + planColor(plan, i) + ';" title="' +
+                escapeHtml(plan) + ': ' + cell.amount_lakh.toFixed(2) + ' L"></span>';
+        });
+        html += '</div></td></tr>';
     });
 
-    html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
-    plans.forEach(function(plan) {
-        var total = quarters.reduce(function(sum, quarter) {
-            return sum + Number((matrix[quarter][plan] || {}).amount_lakh || 0);
-        }, 0);
-        html += '<td>' + total.toFixed(2) + ' L</td>';
-    });
-    html += '<td>' + grandExpected.toFixed(2) + ' L</td><td>' +
-        grandPipeline.toFixed(2) + ' L (' + grandPipelineCount + ' deals)</td></tr>';
-    html += '</tbody></table>';
-    wrap.innerHTML = html;
-
-    if (summary) {
-        summary.innerHTML =
-            '<div class="pipeline-summary-card"><span class="label">Expected Business</span>' +
-            '<span class="value">' + grandExpected.toFixed(2) + ' L</span></div>' +
-            '<div class="pipeline-summary-card"><span class="label">Current Pipeline</span>' +
-            '<span class="value">' + grandPipeline.toFixed(2) + ' L</span></div>';
+    if (m.quarters.length > 1) {
+        html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
+        m.plans.forEach(function(plan) { html += '<td>' + formatLakh(m.planTotals[plan].amount_lakh) + '</td>'; });
+        html += '<td>' + formatLakh(grandExpected.amount_lakh) + '</td>';
+        html += '<td>' + formatLakh(grandPipeline.amount_lakh) + '</td>';
+        html += '<td class="mix-col"></td></tr>';
     }
 
-    attachDrilldownHandlers(ownerId || null, ownerName);
+    html += '</tbody></table></div>';
+    html += notes;
+
+    wrap.innerHTML = html;
 }
 
 
-/* =========================================================
-   FUNNEL (Stage-wise expected business) - trapezoid shape
-   ========================================================= */
+function dataSourceNotes(m, live) {
 
-function renderFunnel(stageBusiness) {
+    var f = fieldInfo;
+    var html = '<div class="data-source">' + live.deals.length + ' deals loaded; ' + m.periodDeals +
+        ' match the selected filters. Amount: ' + escapeHtml(f.amount.label) + ' (' + escapeHtml(f.amount.api) +
+        ', read as ' + amountUnitInUse + '). Plan: ' + escapeHtml(f.plan.label) + ' (' + escapeHtml(f.plan.api) +
+        '). Year: ' + escapeHtml(f.year.label) + ' (' + escapeHtml(f.year.api) + '). Quarter: ' +
+        escapeHtml(f.closingDate) + '. Gist account owner: ' + escapeHtml(f.gist.label) + ' (' +
+        escapeHtml(f.gist.api) + ').</div>';
 
-    var stageOrder = Object.keys(stageBusiness);
-    if (stageOrder.length === 0) return '<div class="loading">No stage data.</div>';
+    var warnings = [];
 
-    var maxCount = Math.max.apply(null, stageOrder.map(function(s) { return stageBusiness[s].count; }).concat([1]));
-    var colors = ["#1f4e78", "#2563eb", "#3b82f6", "#059669", "#f0b429", "#d97706", "#dc2626", "#7c3aed"];
+    if (live.deals.length > 0 && live.fyDealCount === 0) {
+        warnings.push('No deal has Deal Year ' + FY_FILTER + '. Set <code>DEAL_FIELDS.year</code> at the top of ' +
+            'the widget to your Deal Year field\'s API name.');
+    }
+    if (REQUIRE_CLOSING_DATE_IN_FY && live.outsideWindow > 0) {
+        warnings.push(live.outsideWindow + ' deals have Deal Year ' + FY_FILTER + ' but a Closing Date outside ' +
+            '1 Apr ' + FY_START_YEAR + ' - 31 Mar ' + (FY_START_YEAR + 1) + ', so they are not counted. ' +
+            'Correct their Closing Date in Zoho to include them.');
+    }
+    if (m.periodDeals > 0 && m.dealsWithAmount === 0) {
+        warnings.push('Every deal amount is 0 in the field "' + escapeHtml(f.amount.label) + '". Set ' +
+            '<code>DEAL_FIELDS.amount</code> to the API name of the field that holds expected business.');
+    }
+    if (m.periodDeals > 0 && m.dealsWithPlan === 0) {
+        warnings.push('No deal has a value in the field "' + escapeHtml(f.plan.label) + '". Set ' +
+            '<code>DEAL_FIELDS.plan</code> to the API name of your Plan field.');
+    }
+    if (live.gistHqAccountCount > 0 && live.gistValues.length === 0) {
+        warnings.push('No Gist Account Owner values were found on ' + GIST_HQ_OWNER_NAME + ' accounts. Set ' +
+            '<code>ACCOUNT_GIST_FIELD</code> to the API name of that Accounts field.');
+    }
 
-    var widths = stageOrder.map(function(s) {
-        return Math.max(20, Math.round((stageBusiness[s].count / maxCount) * 100));
+    warnings.forEach(function(w) { html += '<div class="warn-note">' + w + '</div>'; });
+
+    return html;
+}
+
+
+function stageColor(stage, index) {
+    if (stage === CLOSED_LOST_STAGE) return "#dc2626";
+    if (PAYMENT_RECEIVED_STAGES.indexOf(stage) !== -1 || stage === "Closed Won") return "#059669";
+    if (PAYMENT_PENDING_STAGES.indexOf(stage) !== -1) return "#10b981";
+    var blues = ["#1f4e78", "#1d5fa8", "#2563eb", "#3b82f6", "#60a5fa"];
+    return blues[index % blues.length];
+}
+
+
+function renderStageFunnel(m) {
+
+    var wrap = document.getElementById("stageFunnelWrap");
+    if (!wrap) return;
+
+    var stages = STAGE_ORDER.filter(function(s) { return m.stageTotals[s] && m.stageTotals[s].count > 0; });
+    Object.keys(m.stageTotals).sort().forEach(function(s) {
+        if (stages.indexOf(s) === -1) stages.push(s);
     });
 
-    var segH = 56;
-    var svgWidth = 300;
-    var totalHeight = segH * stageOrder.length;
+    if (stages.length === 0) {
+        wrap.innerHTML = '<div class="loading">No deals for the selected filters.</div>';
+        return;
+    }
 
-    var polygons = "";
-    var labelRows = "";
+    var maxAmount = Math.max.apply(null, stages.map(function(s) { return m.stageTotals[s].amount_lakh; }));
+    var maxCount = Math.max.apply(null, stages.map(function(s) { return m.stageTotals[s].count; }));
+    var useAmount = maxAmount > 0;
 
-    stageOrder.forEach(function(stage, i) {
+    var totalAmount = 0;
+    var totalCount = 0;
+    var html = '<div class="funnel">';
 
-        var data = stageBusiness[stage];
-        var color = colors[i % colors.length];
+    stages.forEach(function(stage, i) {
 
-        var topWidthPx = (widths[i] / 100) * svgWidth;
-        var bottomWidthPx = ((i < widths.length - 1) ? widths[i + 1] : widths[i]) / 100 * svgWidth;
+        var t = m.stageTotals[stage];
+        var ratio = useAmount ? t.amount_lakh / maxAmount : t.count / maxCount;
+        var width = Math.max(3, Math.round(ratio * 100));
 
-        var topY = i * segH;
-        var bottomY = topY + segH;
+        totalAmount += t.amount_lakh;
+        totalCount += t.count;
 
-        var topLeft = (svgWidth - topWidthPx) / 2;
-        var topRight = svgWidth - topLeft;
-        var bottomLeft = (svgWidth - bottomWidthPx) / 2;
-        var bottomRight = svgWidth - bottomLeft;
-
-        var category = "stage:" + stage;
-
-        polygons += '<polygon class="clickable" data-cat="' + escapeHtml(category) + '" ' +
-            'points="' + topLeft.toFixed(1) + ',' + topY + ' ' + topRight.toFixed(1) + ',' + topY + ' ' +
-            bottomRight.toFixed(1) + ',' + bottomY + ' ' + bottomLeft.toFixed(1) + ',' + bottomY + '" ' +
-            'fill="' + color + '" stroke="#ffffff" stroke-width="2">' +
-            '<title>' + escapeHtml(stage) + ': Rs. ' + data.amount_lakh.toFixed(2) + ' L (' + data.count + ' deals)</title>' +
-            '</polygon>';
-
-        labelRows += '<div class="funnel-label-row clickable" data-cat="' + escapeHtml(category) + '">' +
-            '<span class="funnel-label-dot" style="background:' + color + ';"></span>' +
-            '<span class="funnel-label-text"><span class="stage-name">' + escapeHtml(stage) + '</span>' +
-            '<span class="stage-value">Rs. ' + data.amount_lakh.toFixed(2) + ' L &middot; ' + data.count + ' deals</span></span>' +
+        html += '<div class="funnel-row clickable" data-cat="stage:' + escapeHtml(encodeURIComponent(stage)) + '" ' +
+            'title="Click to see accounts">' +
+            '<div class="funnel-stage">' + escapeHtml(stage) + '</div>' +
+            '<div class="funnel-track"><div class="funnel-bar" style="width:' + width + '%;background:' +
+            stageColor(stage, i) + ';"></div></div>' +
+            '<div class="funnel-value"><span class="big">' + formatLakh(t.amount_lakh) + '</span>' +
+            '<span class="small">' + t.count + (t.count === 1 ? ' deal' : ' deals') + '</span></div>' +
             '</div>';
     });
 
-    var html = '<div class="funnel-wrap">';
-    html += '<svg viewBox="0 0 ' + svgWidth + ' ' + totalHeight + '" class="funnel-svg" preserveAspectRatio="xMidYMid meet">' + polygons + '</svg>';
-    html += '<div class="funnel-labels">' + labelRows + '</div>';
     html += '</div>';
+    html += '<div class="funnel-total">All stages: <strong>' + formatLakh(totalAmount) + '</strong> across ' +
+        totalCount + ' deals</div>';
 
-    return html;
-
+    wrap.innerHTML = html;
 }
 
 
+/* =========================================================
+   ACCOUNT OWNER SUMMARY
+   Activity columns come from account_owner_report_reader (or are
+   calculated live when a Gist account owner is selected).
+   Closed Won / Closed Lost are calculated live from Deals so they
+   follow the quarter and Gist filters. They count accounts.
+   ========================================================= */
+
+function loadAccountOwnerSummary() {
+
+    var container = document.getElementById("accountOwnerSummarySection");
+
+    ZOHO.CRM.FUNCTIONS.execute("account_owner_report_reader", { "arguments": JSON.stringify({}) })
+
+        .then(function(response) {
+
+            var data = findPayload(response);
+
+            if (!data || !Array.isArray(data.owners)) {
+                container.innerHTML = '<div class="error">Could not load Account Owner Summary.</div>';
+                return;
+            }
+
+            lastAccountOwnerSummaryData = data;
+            updateAccountOwnerSummaryDisplay();
+        })
+
+        .catch(function() {
+            container.innerHTML = '<div class="error">Unable to load Account Owner Summary.</div>';
+        });
+}
+
+
+function renderAccountOwnerSummary(data, selectedOwner) {
+
+    var container = document.getElementById("accountOwnerSummarySection");
+
+    var allOwners = data.owners || [];
+    var isFiltered = selectedOwner && selectedOwner !== "All Owners";
+
+    var visibleOwners = isFiltered
+        ? allOwners.filter(function(o) {
+            return String(o.owner_name || "").trim().toLowerCase() === selectedOwner.trim().toLowerCase();
+        })
+        : allOwners;
+
+    if (isFiltered && visibleOwners.length === 0) {
+        container.innerHTML = '<div class="loading">No Account Owner Summary data for ' + escapeHtml(selectedOwner) + '.</div>';
+        return;
+    }
+
+    var PENDING = "…";
+
+    function cell(count, ownerId, category) {
+        if (count === PENDING) return '<td>' + PENDING + '</td>';
+        count = count || 0;
+        if (count > 0) {
+            return '<td class="clickable plain" data-owner-id="' + escapeHtml(ownerId || "") + '" data-cat="' +
+                escapeHtml(category) + '">' + count + '</td>';
+        }
+        return '<td>' + count + '</td>';
+    }
+
+    var html = '<div class="table-scroll"><table><thead><tr>';
+    html += '<th style="text-align:left;">Account Owner</th><th>Total</th><th>Last 30</th>';
+    html += '<th>31-60</th><th>60+</th><th>Touched</th><th>Non-Touched</th>';
+    html += '<th>Closed Won</th><th>Closed Lost</th>';
+    html += '</tr></thead><tbody>';
+
+    var keys = ["total_accounts", "last_30", "days_31_60", "days_60_plus", "touched", "non_touched", "closed_won", "closed_lost"];
+    var grand = {};
+    keys.forEach(function(k) { grand[k] = 0; });
+    var grandPending = false;
+
+    visibleOwners.forEach(function(owner) {
+
+        var ownerKey = String(owner.owner_name || "").trim().toLowerCase();
+        var row = {
+            total_accounts: owner.total_accounts,
+            last_30: owner.last_30,
+            days_31_60: owner.days_31_60,
+            days_60_plus: owner.days_60_plus,
+            touched: owner.touched,
+            non_touched: owner.non_touched
+        };
+
+        if (aorLive && aorLive.gistActive && isGistHqName(owner.owner_name)) {
+            var s = aorLive.gistStats;
+            row = s ? {
+                total_accounts: s.total, last_30: s.last_30, days_31_60: s.days_31_60,
+                days_60_plus: s.days_60_plus, touched: s.touched, non_touched: s.untouched
+            } : {
+                total_accounts: PENDING, last_30: PENDING, days_31_60: PENDING,
+                days_60_plus: PENDING, touched: PENDING, non_touched: PENDING
+            };
+        }
+
+        if (aorLive) {
+            var wl = aorLive.wonLost[ownerKey] || { won: {}, lost: {} };
+            row.closed_won = Object.keys(wl.won).length;
+            row.closed_lost = Object.keys(wl.lost).length;
+        } else {
+            row.closed_won = PENDING;
+            row.closed_lost = PENDING;
+        }
+
+        html += '<tr><td class="row-label">' + escapeHtml(owner.owner_name) + '</td>';
+        html += cell(row.total_accounts, owner.owner_id, "aor:total");
+        html += cell(row.last_30, owner.owner_id, "aor:last_30");
+        html += cell(row.days_31_60, owner.owner_id, "aor:days_31_60");
+        html += cell(row.days_60_plus, owner.owner_id, "aor:days_60_plus");
+        html += cell(row.touched, owner.owner_id, "aor:touched");
+        html += cell(row.non_touched, owner.owner_id, "aor:non_touched");
+        html += cell(row.closed_won, owner.owner_id, "aor:closed_won");
+        html += cell(row.closed_lost, owner.owner_id, "aor:closed_lost");
+        html += '</tr>';
+
+        keys.forEach(function(k) {
+            if (row[k] === PENDING) grandPending = true;
+            else grand[k] += Number(row[k] || 0);
+        });
+    });
+
+    if (!isFiltered) {
+        html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
+        keys.forEach(function(k) {
+            var pendingCol = grandPending && (k === "closed_won" || k === "closed_lost") && !aorLive;
+            html += '<td>' + (pendingCol ? PENDING : grand[k]) + '</td>';
+        });
+        html += '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+
+    container.innerHTML = html;
+
+    container.querySelectorAll(".clickable").forEach(function(el) {
+        el.onclick = function() {
+            var row = el.closest("tr");
+            var ownerName = row ? row.querySelector("td.row-label").innerText : "";
+            openDrilldown(el.getAttribute("data-owner-id") || null, ownerName, el.getAttribute("data-cat"));
+        };
+    });
+}
+
 
 /* =========================================================
-   DRILLDOWN (client-side, live ZOHO.CRM.API calls - same
-   proven approach as the Account Owner Report widget, since
-   server-function argument passing was unreliable in this
-   environment)
+   DRILLDOWN
    ========================================================= */
 
 function zohoSearchAll(module, criteria) {
@@ -998,9 +1813,7 @@ function zohoSearchAll(module, criteria) {
             searchPromise
                 .then(function(response) {
 
-                    if (response && response.data) {
-                        allRecords = allRecords.concat(response.data);
-                    }
+                    if (response && response.data) allRecords = allRecords.concat(response.data);
 
                     if (response && response.info && response.info.more_records === true && page < 150) {
                         page++;
@@ -1009,7 +1822,8 @@ function zohoSearchAll(module, criteria) {
                         resolve(allRecords);
                     }
                 })
-                .catch(function() {
+                .catch(function(err) {
+                    console.error(module + " fetch stopped on page " + page + ":", err);
                     resolve(allRecords);
                 });
         }
@@ -1031,14 +1845,18 @@ function ddLookupName(value, fallback) {
 }
 
 
+/* Date-only values ("2026-04-01") are read as local dates, so 1 April stays in Q1 */
 function ddParseDate(value) {
     if (!value) return null;
-    var d = new Date(value);
+    var s = String(value).trim();
+    var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    var d = new Date(s);
     return isNaN(d.getTime()) ? null : d;
 }
 
 
-function ddFiscalQuarter(date) {
+function monthQuarter(date) {
     if (!date) return null;
     var month = date.getMonth() + 1;
     if (month >= 4 && month <= 6) return "Q1";
@@ -1049,19 +1867,12 @@ function ddFiscalQuarter(date) {
 
 
 function attachDrilldownHandlers(ownerId, ownerName) {
-
-    document.querySelectorAll(".clickable").forEach(function(el) {
-
+    document.querySelectorAll("#content .clickable").forEach(function(el) {
         el.onclick = function() {
-
             var category = el.getAttribute("data-cat");
-            if (!category) return;
-
-            openDrilldown(ownerId || null, ownerName, category);
+            if (category) openDrilldown(ownerId || null, ownerName, category);
         };
-
     });
-
 }
 
 
@@ -1074,26 +1885,25 @@ function categoryLabel(category) {
         "current_pipeline": "Current Pipeline",
         "total_accounts": "Total Accounts",
         "untouched": "Untouched Accounts",
-        "touched": "Touched Accounts"
+        "touched": "Touched Accounts",
+        "aor:total": "Total Accounts",
+        "aor:last_30": "Touched in Last 30 Days",
+        "aor:days_31_60": "Touched 31-60 Days Ago",
+        "aor:days_60_plus": "Touched 60+ Days Ago",
+        "aor:touched": "Touched Accounts",
+        "aor:non_touched": "Non-Touched Accounts",
+        "aor:closed_won": "Closed Won Accounts",
+        "aor:closed_lost": "Closed Lost Accounts"
     };
 
     if (labels[category]) return labels[category];
 
-    if (category.indexOf("bucket:") === 0) {
-        var parts = category.split(":");
-        return parts[1] + " - " + parts[2].replace(/_/g, " ");
-    }
+    var parts = category.split(":");
 
-    if (category.indexOf("qp:") === 0) {
-        var qpParts = category.split(":");
-        return qpParts[1] + " - " + qpParts[2] + " Expected Business";
-    }
-
-    if (category.indexOf("quarter:") === 0) return category.substring(8) + " Expected Business";
-    if (category.indexOf("quarter_pipeline:") === 0) return category.substring(17) + " Current Pipeline";
-    if (category.indexOf("plan:") === 0) return category.substring(5) + " Expected Business";
-    if (category.indexOf("stage:") === 0) return category.substring(6) + " Deals";
-    if (category.indexOf("aor:") === 0) return category.substring(4).replace(/_/g, " ").replace(/^stage:/, "") + " (Account Owner Summary)";
+    if (parts[0] === "bucket") return decodeURIComponent(parts[1]) + " - " + parts[2].replace(/_/g, " ");
+    if (parts[0] === "qp") return decodeURIComponent(parts[1]) + " " + decodeURIComponent(parts[2]) + " Expected Business";
+    if (parts[0] === "quarter_pipeline") return decodeURIComponent(parts[1]) + " Current Pipeline";
+    if (parts[0] === "stage") return decodeURIComponent(parts[1]);
 
     return category;
 }
@@ -1118,18 +1928,16 @@ function openDrilldown(ownerId, ownerName, category) {
                 return;
             }
 
-            var html = "<ul>";
+            var html = '<div class="modal-count">' + names.length + (names.length === 1 ? ' account' : ' accounts') + '</div><ul>';
             names.forEach(function(name) { html += "<li>" + escapeHtml(name) + "</li>"; });
             html += "</ul>";
             body.innerHTML = html;
-
         })
 
         .catch(function(err) {
             body.innerHTML = '<div class="modal-empty">Failed to load records.</div>';
             console.error("Drilldown error:", err);
         });
-
 }
 
 
@@ -1138,500 +1946,108 @@ function closeDrilldown() {
 }
 
 
+function sortNames(names) {
+    return names.sort(function(a, b) { return String(a).toLowerCase().localeCompare(String(b).toLowerCase()); });
+}
+
+
+var AOR_CATEGORY_MAP = {
+    "aor:total": "total_accounts",
+    "aor:touched": "touched",
+    "aor:non_touched": "untouched",
+    "aor:last_30": "aging:last_30",
+    "aor:days_31_60": "aging:days_31_60",
+    "aor:days_60_plus": "aging:days_60_plus",
+    "aor:closed_won": "won_accounts",
+    "aor:closed_lost": "lost_accounts"
+};
+
+
 async function runDrilldown(ownerId, ownerName, category) {
 
-    if (category.indexOf("aor:") === 0) {
-        return runDrilldownAOR(ownerId, category);
+    var live = await loadLiveData();
+
+    if (!ownerId && ownerName && ownerName !== "All Owners") {
+        ownerId = live.ownerIdByName[ownerName.trim().toLowerCase()] || "__no_owner__";
     }
 
-    var isAllOwners = !ownerId;
+    if (AOR_CATEGORY_MAP[category]) category = AOR_CATEGORY_MAP[category];
 
-    if (category.indexOf("qp:") === 0 || category.indexOf("quarter_pipeline:") === 0) {
+    var parts = category.split(":");
+    var kind = parts[0];
+    var selectedQuarter = currentQuarterSelection();
+    var gistSelection = currentGistSelection();
 
-        var qpParts = category.split(":");
-        var targetQuarter = qpParts[1];
-        var targetPlan = qpParts[2];
+    var dealKinds = ["qp", "quarter_pipeline", "stage", "won_accounts", "lost_accounts"];
 
-        var accountsForQp = await zohoSearchAll("Accounts", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
-        var accountIdSetQp = {};
-        accountsForQp.forEach(function(a) { if (a.id) accountIdSetQp[String(a.id)] = true; });
+    if (CARD_CATEGORIES.indexOf(category) !== -1 || dealKinds.indexOf(kind) !== -1) {
 
-        var dealsForQp = await getAllDealsCached();
-        var uniqueQp = {};
+        var unique = {};
 
-        dealsForQp.forEach(function(deal) {
+        live.deals.forEach(function(deal) {
 
-            var dealYear = String(deal.Year2 || "").trim();
-            if (dealYear !== "2026-2027") return;
+            var ctx = dealContext(deal, live, selectedQuarter, gistSelection);
+            if (!ctx) return;
 
-            var accId = ddLookupId(deal.Account_Name);
-            if (!accId) return;
-            if (!isAllOwners && !accountIdSetQp[accId]) return;
+            var ok = false;
 
-            var closingDate = ddParseDate(deal.Closing_Date);
-            if (ddFiscalQuarter(closingDate) !== targetQuarter) return;
-
-            var plan = deal.Deal_Category || "No Plan";
-            if (category.indexOf("qp:") === 0 && plan !== targetPlan) return;
-            if (category.indexOf("quarter_pipeline:") === 0 && !isCurrentPipelineStage(deal.Stage)) return;
-
-            var accName = ddLookupName(deal.Account_Name, "(Unnamed Account)");
-            uniqueQp[accId] = accName;
-        });
-
-        return Object.values(uniqueQp).sort();
-    }
-
-    if (category === "total_accounts" || category === "untouched" || category === "touched" || category.indexOf("bucket:") === 0) {
-
-        var accounts = await zohoSearchAll("Accounts", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
-
-        var accountById = {};
-        accounts.forEach(function(a) {
-            if (a.id) {
-                accountById[String(a.id)] = {
-                    name: a.Account_Name || "",
-                    ownerId: ddLookupId(a.Owner),
-                    bucket: a.Bucket_Type || "No Bucket"
-                };
-            }
-        });
-
-        if (category === "total_accounts") {
-            return Object.values(accountById).map(function(a) { return a.name; }).sort();
-        }
-
-        var calls = await zohoSearchAll("Calls", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
-
-        var latestCallByAccount = {};
-
-        calls.forEach(function(call) {
-
-            var whatId = ddLookupId(call.What_Id);
-            var account = accountById[whatId];
-            if (!account) return;
-
-            var callOwnerId = ddLookupId(call.Owner);
-            if (!callOwnerId || callOwnerId !== account.ownerId) return;
-
-            var callDate = ddParseDate(call.Call_Start_Time);
-            if (!callDate) return;
-
-            if (!latestCallByAccount[whatId] || callDate > latestCallByAccount[whatId]) {
-                latestCallByAccount[whatId] = callDate;
-            }
-        });
-
-        var now = new Date();
-        var matches = [];
-
-        Object.keys(accountById).forEach(function(accId) {
-
-            var account = accountById[accId];
-            var lastCall = latestCallByAccount[accId];
-
-            var agingBucket = null;
-
-            if (lastCall) {
-                var daysOld = (now - lastCall) / 86400000;
-                if (daysOld <= 30) agingBucket = "last_30";
-                else if (daysOld <= 60) agingBucket = "days_31_60";
-                else agingBucket = "days_60_plus";
-            }
-
-            var isMatch = false;
-
-            if (category === "untouched") {
-                isMatch = !lastCall;
-            } else if (category === "touched") {
-                isMatch = !!lastCall;
-            } else if (category.indexOf("bucket:") === 0) {
-
-                var parts = category.split(":");
-                var bucketName = parts[1];
-                var bucketCategory = parts[2];
-
-                if (account.bucket !== bucketName) {
-                    isMatch = false;
-                } else if (bucketCategory === "Total") {
-                    isMatch = true;
-                } else if (bucketCategory === "non_touched") {
-                    isMatch = !lastCall;
-                } else {
-                    isMatch = (agingBucket === bucketCategory);
+            if (CARD_CATEGORIES.indexOf(category) !== -1) {
+                ok = matchesCardCategory(ctx, category, ownerId);
+            } else if (matchesAccountOwner(ctx, ownerId)) {
+                if (kind === "qp") {
+                    ok = ctx.quarter === decodeURIComponent(parts[1]) &&
+                        ctx.plan === decodeURIComponent(parts[2]) && countsAsExpected(ctx);
+                } else if (kind === "quarter_pipeline") {
+                    ok = ctx.quarter === decodeURIComponent(parts[1]) && isCurrentPipelineStage(ctx.stage);
+                } else if (kind === "stage") {
+                    ok = ctx.stage === decodeURIComponent(parts[1]);
+                } else if (kind === "won_accounts") {
+                    ok = isClosedWonStage(ctx.stage) && !ctx.excluded;
+                } else if (kind === "lost_accounts") {
+                    ok = ctx.stage === CLOSED_LOST_STAGE;
                 }
             }
 
-            if (isMatch) matches.push(account.name);
+            if (ok) unique[ctx.accId] = ctx.accName;
         });
 
-        return matches.sort();
+        return sortNames(Object.values(unique));
     }
 
-    if (category === "achieved" || category === "payment_received" || category === "payment_pending" || category === "current_pipeline") {
+    var accounts = filterAccounts(live, ownerId, gistSelection);
 
-        var deals2 = await zohoSearchAll("Deals", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
-
-        var accountOwnerById = {};
-
-        if (category === "current_pipeline") {
-            var accountsForPipeline = await zohoSearchAll("Accounts", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
-            accountsForPipeline.forEach(function(a) {
-                if (a.id) accountOwnerById[String(a.id)] = ddLookupName(a.Owner);
-            });
-        }
-
-        var uniqueAccounts = {}; // accountId -> accountName, dedup via object keys
-
-        deals2.forEach(function(deal) {
-
-            var dealOwnerName = ddLookupName(deal.Owner);
-            var dealName = String(deal.Deal_Name || "");
-            var stage = deal.Stage || "";
-            var dealYear = String(deal.Year2 || "").trim();
-            var yearMatches = (dealYear === "2026-2027");
-
-            var accId = ddLookupId(deal.Account_Name);
-            var accName = ddLookupName(deal.Account_Name, "(Unnamed Account)");
-
-            if (!yearMatches || !accId) return;
-
-            var excludedTest = dealName.toLowerCase().indexOf("test") !== -1 || dealName.toLowerCase().indexOf("trigya") !== -1;
-            var isPaymentReceived = ["Payment Received", "Short Payment", "Part Payment Received"].indexOf(stage) !== -1 && !excludedTest;
-            var isPaymentPending = ["Order Booked", "Email Confirmation", "PI Sent - Order Received"].indexOf(stage) !== -1;
-            var isClosedWon = isClosedWonStage(stage) && !excludedTest;
-
-            if (category === "achieved") {
-                if (isClosedWon) {
-                    uniqueAccounts[accId] = accName;
-                }
-            } else if (category === "payment_received") {
-                if (isPaymentReceived) {
-                    uniqueAccounts[accId] = accName;
-                }
-            } else if (category === "payment_pending") {
-                if (isPaymentPending) {
-                    uniqueAccounts[accId] = accName;
-                }
-            } else if (category === "current_pipeline") {
-                var accOwnerName = accountOwnerById[accId];
-                if (accOwnerName && accOwnerName === dealOwnerName && isCurrentPipelineStage(stage)) {
-                    uniqueAccounts[accId] = accName;
-                }
-            }
-        });
-
-        return Object.values(uniqueAccounts).sort();
+    if (category === "total_accounts") {
+        return sortNames(accounts.map(function(a) { return a.name; }));
     }
 
-    var accountsForDeals = await zohoSearchAll("Accounts", isAllOwners ? null : "(Owner:equals:" + ownerId + ")");
-    var accountIdSet = {};
-    accountsForDeals.forEach(function(a) { if (a.id) accountIdSet[String(a.id)] = true; });
-
-    var allDeals = await getAllDealsCached();
-    var uniqueAccounts2 = {};
-
-    allDeals.forEach(function(deal) {
-
-        var accId = ddLookupId(deal.Account_Name);
-        var accName = ddLookupName(deal.Account_Name, "(Unnamed Account)");
-
-        if (!accId) return;
-        if (!isAllOwners && !accountIdSet[accId]) return;
-
-        var dealYear = String(deal.Year2 || "").trim();
-        if (dealYear !== "2026-2027") return;
-
-        var stage = deal.Stage || "";
-
-        if (category.indexOf("quarter:") === 0) {
-
-            var targetQuarter = category.substring(8);
-            var closingDate = ddParseDate(deal.Closing_Date);
-            if (ddFiscalQuarter(closingDate) === targetQuarter) uniqueAccounts2[accId] = accName;
-
-        } else if (category.indexOf("plan:") === 0) {
-
-            var targetPlan = category.substring(5);
-            var dealPlan = deal.Deal_Category || "No Plan";
-            if (dealPlan === targetPlan) uniqueAccounts2[accId] = accName;
-
-        } else if (category.indexOf("stage:") === 0) {
-
-            var targetStage = category.substring(6);
-            if (stage === targetStage) uniqueAccounts2[accId] = accName;
-        }
-    });
-
-    return Object.values(uniqueAccounts2).sort();
-
-}
-
-
-
-/* =========================================================
-   ACCOUNT OWNER SUMMARY (embedded from the other report's cache,
-   FY 2026-27 view - shown at the bottom of this dashboard)
-   ========================================================= */
-
-function loadAccountOwnerSummary() {
-
-    var container = document.getElementById("accountOwnerSummarySection");
-
-    ZOHO.CRM.FUNCTIONS.execute("account_owner_report_reader", { "arguments": JSON.stringify({}) })
-
-        .then(function(response) {
-
-            var data = findPayload(response);
-
-            if (!data || !Array.isArray(data.owners)) {
-                container.innerHTML = '<div class="error">Could not load Account Owner Summary.</div>';
-                return;
-            }
-
-            lastAccountOwnerSummaryData = data;
-
-            var selectedOwner = document.getElementById("ownerFilter").value || "All Owners";
-            renderAccountOwnerSummary(data, selectedOwner);
-
-        })
-
-        .catch(function() {
-            container.innerHTML = '<div class="error">Unable to load Account Owner Summary.</div>';
-        });
-
-}
-
-
-function renderAccountOwnerSummary(data, selectedOwner) {
-
-    var container = document.getElementById("accountOwnerSummarySection");
-
-    var allOwners = data.owners || [];
-    var isFiltered = selectedOwner && selectedOwner !== "All Owners";
-
-    var visibleOwners = isFiltered
-        ? allOwners.filter(function(o) { return o.owner_name === selectedOwner; })
-        : allOwners;
-
-    if (isFiltered && visibleOwners.length === 0) {
-        container.innerHTML = '<div class="loading">No Account Owner Summary data for ' + escapeHtml(selectedOwner) + '.</div>';
-        return;
-    }
-
-    function cell(count, ownerId, category) {
-        if (count && count > 0 && ownerId) {
-            return '<td class="clickable" data-owner-id="' + escapeHtml(ownerId) + '" data-cat="' + escapeHtml(category) + '">' + count + '</td>';
-        }
-        return '<td>' + count + '</td>';
-    }
-
-    function stageCategories(deals) {
-        var result = { closed_won: 0, closed_lost: 0, open_stage: 0 };
-        var stages = (deals && deals.stages) || {};
-
-        Object.keys(stages).forEach(function(stage) {
-            var count = Number(stages[stage] || 0);
-            if (isClosedWonStage(stage)) result.closed_won += count;
-            else if (String(stage).trim() === "Closed Lost") result.closed_lost += count;
-            else result.open_stage += count;
-        });
-
-        // Prefer explicit server totals when available, but still classify
-        // the existing stage map so older cached payloads work correctly.
-        if (deals && typeof deals.closed_won === "number") result.closed_won = deals.closed_won;
-        if (deals && typeof deals.closed_lost === "number") result.closed_lost = deals.closed_lost;
-        if (deals && typeof deals.open_stage === "number") result.open_stage = deals.open_stage;
-        return result;
-    }
-
-    var html = '<table><thead><tr>';
-    html += '<th style="text-align:left;">Account Owner</th><th>Total</th><th>Last 30</th>';
-    html += '<th>31-60</th><th>60+</th><th>Touched</th><th>Non-Touched</th><th>With Deal</th><th>No Deal</th>';
-    html += '<th>Closed Won</th><th>Closed Lost</th><th>Open Stage</th>';
-    html += '</tr></thead><tbody>';
-
-    visibleOwners.forEach(function(owner) {
-
-        var deals = owner.deals_fy || { with_deal: 0, no_deal: 0, stages: {} };
-        var categories = stageCategories(deals);
-        var ownerId = owner.owner_id;
-
-        html += '<tr>';
-        html += '<td class="row-label">' + escapeHtml(owner.owner_name) + '</td>';
-        html += cell(owner.total_accounts, ownerId, "aor:total");
-        html += cell(owner.last_30, ownerId, "aor:last_30");
-        html += cell(owner.days_31_60, ownerId, "aor:days_31_60");
-        html += cell(owner.days_60_plus, ownerId, "aor:days_60_plus");
-        html += cell(owner.touched, ownerId, "aor:touched");
-        html += cell(owner.non_touched, ownerId, "aor:non_touched");
-        html += cell(deals.with_deal, ownerId, "aor:with_deal");
-        html += cell(deals.no_deal, ownerId, "aor:no_deal");
-
-        html += cell(categories.closed_won, ownerId, "aor:closed_won");
-        html += cell(categories.closed_lost, ownerId, "aor:closed_lost");
-        html += cell(categories.open_stage, ownerId, "aor:open_stage");
-
-        html += '</tr>';
-
-    });
-
-    var grand = { total_accounts: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, touched: 0, non_touched: 0 };
-    var grandDeals = { with_deal: 0, no_deal: 0, closed_won: 0, closed_lost: 0, open_stage: 0 };
-
-    visibleOwners.forEach(function(owner) {
-
-        grand.total_accounts += owner.total_accounts || 0;
-        grand.last_30 += owner.last_30 || 0;
-        grand.days_31_60 += owner.days_31_60 || 0;
-        grand.days_60_plus += owner.days_60_plus || 0;
-        grand.touched += owner.touched || 0;
-        grand.non_touched += owner.non_touched || 0;
-
-        var deals = owner.deals_fy || { with_deal: 0, no_deal: 0, stages: {} };
-        var categories = stageCategories(deals);
-        grandDeals.with_deal += deals.with_deal || 0;
-        grandDeals.no_deal += deals.no_deal || 0;
-        grandDeals.closed_won += categories.closed_won;
-        grandDeals.closed_lost += categories.closed_lost;
-        grandDeals.open_stage += categories.open_stage;
-    });
-
-    if (!isFiltered) {
-
-        html += '<tr class="grand-total"><td class="row-label">Grand Total</td>';
-        html += '<td>' + (grand.total_accounts || 0) + '</td><td>' + (grand.last_30 || 0) + '</td>';
-        html += '<td>' + (grand.days_31_60 || 0) + '</td><td>' + (grand.days_60_plus || 0) + '</td>';
-        html += '<td>' + (grand.touched || 0) + '</td><td>' + (grand.non_touched || 0) + '</td>';
-        html += '<td>' + grandDeals.with_deal + '</td><td>' + grandDeals.no_deal + '</td>';
-        html += '<td>' + grandDeals.closed_won + '</td><td>' + grandDeals.closed_lost + '</td>';
-        html += '<td>' + grandDeals.open_stage + '</td>';
-
-        html += '</tr>';
-    }
-
-    html += '</tbody></table>';
-
-    container.innerHTML = html;
-
-    container.querySelectorAll(".clickable").forEach(function(el) {
-        el.onclick = function() {
-            var ownerId = el.getAttribute("data-owner-id");
-            var category = el.getAttribute("data-cat");
-            var row = el.closest("tr");
-            var ownerName = row ? row.querySelector("td.row-label").innerText : "";
-            openDrilldown(ownerId, ownerName, category);
-        };
-    });
-
-}
-
-
-async function runDrilldownAOR(ownerId, category) {
-
-    // category arrives as "aor:xxx" - strip the prefix
-    var innerCategory = category.substring(4);
-
-    var accounts = await zohoSearchAll("Accounts", "(Owner:equals:" + ownerId + ")");
-
-    var accountById = {};
-    accounts.forEach(function(a) {
-        if (a.id) accountById[String(a.id)] = { name: a.Account_Name || "" };
-    });
-
-    var accountIds = Object.keys(accountById);
-    if (accountIds.length === 0) return [];
-
-    if (innerCategory === "total") {
-        return Object.values(accountById).map(function(a) { return a.name; }).sort();
-    }
-
-    var calls = await zohoSearchAll("Calls", "(Owner:equals:" + ownerId + ")");
-
-    var latestCallByAccount = {};
-
-    calls.forEach(function(call) {
-        var whatId = ddLookupId(call.What_Id);
-        if (!whatId || !accountById[whatId]) return;
-        var callDate = ddParseDate(call.Call_Start_Time);
-        if (!callDate) return;
-        if (!latestCallByAccount[whatId] || callDate > latestCallByAccount[whatId]) {
-            latestCallByAccount[whatId] = callDate;
-        }
-    });
-
-    var needsDeals = (
-        innerCategory === "with_deal" ||
-        innerCategory === "no_deal" ||
-        innerCategory.indexOf("stage:") === 0 ||
-        ["closed_won", "closed_lost", "open_stage"].indexOf(innerCategory) !== -1
-    );
-    var latestDealByAccount = {};
-
-    if (needsDeals) {
-
-        var batchSize = 10;
-
-        for (var i = 0; i < accountIds.length; i += batchSize) {
-
-            var batch = accountIds.slice(i, i + batchSize);
-            var orCriteria = "(" + batch.map(function(id) { return "(Account_Name:equals:" + id + ")"; }).join("or") + ")";
-
-            var deals = await zohoSearchAll("Deals", orCriteria);
-
-            deals.forEach(function(deal) {
-                var accId = ddLookupId(deal.Account_Name);
-                if (!accId || !accountById[accId]) return;
-                var dealDate = ddParseDate(deal.Modified_Time) || ddParseDate(deal.Created_Time);
-                if (!dealDate) return;
-                var existing = latestDealByAccount[accId];
-                if (!existing || dealDate > existing.date) {
-                    latestDealByAccount[accId] = { date: dealDate, stage: deal.Stage || "Unknown" };
-                }
-            });
-        }
-    }
-
-    var now = new Date();
+    var calls = await getOwnerCalls(ownerId);
+    var latest = latestOwnerCalls(accounts, calls);
     var matches = [];
 
-    accountIds.forEach(function(accId) {
+    accounts.forEach(function(account) {
 
-        var account = accountById[accId];
-        var lastCall = latestCallByAccount[accId];
-        var lastDeal = latestDealByAccount[accId];
-
-        var touched = !!lastCall;
-        var agingBucket = null;
-
-        if (touched) {
-            var daysOld = (now - lastCall) / 86400000;
-            if (daysOld <= 30) agingBucket = "last_30";
-            else if (daysOld <= 60) agingBucket = "days_31_60";
-            else agingBucket = "days_60_plus";
-        }
-
-        var withDeal = !!lastDeal;
-        var stage = lastDeal ? lastDeal.stage : null;
-
+        var lastCall = latest[account.id];
+        var age = lastCall ? agingOf(lastCall) : null;
         var isMatch = false;
 
-        if (innerCategory === "touched") isMatch = touched;
-        else if (innerCategory === "non_touched") isMatch = !touched;
-        else if (["last_30", "days_31_60", "days_60_plus"].indexOf(innerCategory) !== -1) isMatch = (agingBucket === innerCategory);
-        else if (innerCategory === "with_deal") isMatch = withDeal;
-        else if (innerCategory === "no_deal") isMatch = !withDeal;
-        else if (innerCategory === "closed_won") isMatch = withDeal && isClosedWonStage(stage);
-        else if (innerCategory === "closed_lost") isMatch = withDeal && stage === "Closed Lost";
-        else if (innerCategory === "open_stage") isMatch = withDeal && !isClosedWonStage(stage) && stage !== "Closed Lost";
-        else if (innerCategory.indexOf("stage:") === 0) isMatch = withDeal && stage === innerCategory.substring(6);
+        if (category === "untouched") {
+            isMatch = !lastCall;
+        } else if (category === "touched") {
+            isMatch = !!lastCall;
+        } else if (kind === "aging") {
+            isMatch = age === parts[1];
+        } else if (kind === "bucket") {
+            if (account.bucket === decodeURIComponent(parts[1])) {
+                if (parts[2] === "Total") isMatch = true;
+                else if (parts[2] === "non_touched") isMatch = !lastCall;
+                else isMatch = age === parts[2];
+            }
+        }
 
         if (isMatch) matches.push(account.name);
-
     });
 
-    return matches.sort();
-
+    return sortNames(matches);
 }
 
 
