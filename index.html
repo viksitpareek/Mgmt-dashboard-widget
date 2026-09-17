@@ -1603,7 +1603,26 @@ function agingOf(date) {
 }
 
 
-function computeAccountStats(accounts, calls) {
+/*
+ * Per account: does it have a Deal Type New, Deal Year FY deal that is open /
+ * Closed Won / Closed Lost, with that stage's date in the FY (and the selected quarter)?
+ * Open = Expected Order Date, Closed Won = Actual Order Date, Closed Lost = Closing Date.
+ */
+function computeAccountDealStatus(live, selectedQuarter, gistSelection) {
+    var status = {};
+    live.deals.forEach(function(deal) {
+        var ctx = dealContext(deal, live, selectedQuarter, gistSelection, false);
+        if (!ctx || isRemovedStage(ctx.stage)) return;
+        var st = status[ctx.accId] || (status[ctx.accId] = { open: false, won: false, lost: false });
+        if (isClosedWonStage(ctx.stage)) { if (!ctx.excluded) st.won = true; }
+        else if (isClosedLostStage(ctx.stage)) st.lost = true;
+        else st.open = true;
+    });
+    return status;
+}
+
+
+function computeAccountStats(accounts, calls, dealStatus) {
 
     var latest = latestOwnerCalls(accounts, calls);
     var stats = { total: 0, touched: 0, untouched: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, bucket_summary: {} };
@@ -1613,11 +1632,19 @@ function computeAccountStats(accounts, calls) {
         stats.total++;
 
         if (!stats.bucket_summary[a.bucket]) {
-            stats.bucket_summary[a.bucket] = { Total: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, non_touched: 0 };
+            stats.bucket_summary[a.bucket] = { Total: 0, open_deals: 0, closed_lost: 0, closed_won: 0,
+                last_30: 0, days_31_60: 0, days_60_plus: 0, non_touched: 0 };
         }
 
         var bs = stats.bucket_summary[a.bucket];
         bs.Total++;
+
+        var ds = dealStatus && dealStatus[a.id];
+        if (ds) {
+            if (ds.open) bs.open_deals++;
+            if (ds.lost) bs.closed_lost++;
+            if (ds.won) bs.closed_won++;
+        }
 
         var lastCall = latest[a.id];
 
@@ -1699,7 +1726,9 @@ function renderAll() {
     html += '</div>';
 
     html += '<div class="section"><h2>Bucket-wise Activity</h2>';
-    html += '<p class="section-note">Accounts with a Deal Type New deal. Activity is measured from today, so the quarter filter does not change it.</p>';
+    html += '<p class="section-note">Accounts with a Deal Type New deal. Open Deals, Closed Lost and Closed Won count accounts with a ' +
+        'Deal Type New, Deal Year ' + FY_FILTER + ' deal in that stage (Expected Order Date / Closing Date / Actual Order Date in the ' +
+        'selected period). Call activity is measured from today, so the quarter filter does not change it.</p>';
     html += '<div id="bucketWrap"><div class="loading">Calculating account activity...</div></div>';
     html += '</div>';
 
@@ -1755,7 +1784,7 @@ function renderAll() {
             if (myToken !== renderToken) return;
 
             var accounts = filterAccounts(live, owners.set, gistSelection);
-            var stats = computeAccountStats(accounts, calls);
+            var stats = computeAccountStats(accounts, calls, computeAccountDealStatus(live, selectedQuarter, gistSelection));
 
             setCardValue("total_accounts", stats.total);
             setCardValue("untouched", stats.untouched);
@@ -1909,9 +1938,10 @@ function renderBucketTable(bucketSummary) {
     if (buckets.length === 0) return '<div class="loading">No accounts for the selected filters.</div>';
 
     var html = '<div class="table-scroll"><table><thead><tr><th style="text-align:left;">Bucket</th>' +
-        '<th>Total</th><th>Last 30 Days</th><th>31-60 Days</th><th>60+ Days</th><th>Non-Touched</th></tr></thead><tbody>';
+        '<th>Total</th><th>Open Deals</th><th>Closed Lost</th><th>Closed Won</th>' +
+        '<th>Last 30 Days</th><th>31-60 Days</th><th>60+ Days</th><th>Non-Touched</th></tr></thead><tbody>';
 
-    var grand = { Total: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, non_touched: 0 };
+    var grand = { Total: 0, open_deals: 0, closed_lost: 0, closed_won: 0, last_30: 0, days_31_60: 0, days_60_plus: 0, non_touched: 0 };
 
     function bucketCell(count, category) {
         if (count && count > 0) return '<td class="clickable plain" data-cat="' + escapeHtml(category) + '">' + count + '</td>';
@@ -1925,6 +1955,9 @@ function renderBucketTable(bucketSummary) {
 
         html += '<tr><td class="row-label">' + escapeHtml(bucket) + '</td>';
         html += bucketCell(row.Total, prefix + "Total");
+        html += bucketCell(row.open_deals, prefix + "open_deals");
+        html += bucketCell(row.closed_lost, prefix + "closed_lost");
+        html += bucketCell(row.closed_won, prefix + "closed_won");
         html += bucketCell(row.last_30, prefix + "last_30");
         html += bucketCell(row.days_31_60, prefix + "days_31_60");
         html += bucketCell(row.days_60_plus, prefix + "days_60_plus");
@@ -1935,7 +1968,8 @@ function renderBucketTable(bucketSummary) {
     });
 
     html += '<tr class="grand-total"><td class="row-label">Grand Total</td>' +
-        '<td>' + grand.Total + '</td><td>' + grand.last_30 + '</td>' +
+        '<td>' + grand.Total + '</td><td>' + grand.open_deals + '</td><td>' + grand.closed_lost + '</td><td>' +
+        grand.closed_won + '</td><td>' + grand.last_30 + '</td>' +
         '<td>' + grand.days_31_60 + '</td><td>' + grand.days_60_plus + '</td>' +
         '<td>' + grand.non_touched + '</td></tr>';
 
@@ -1945,14 +1979,48 @@ function renderBucketTable(bucketSummary) {
 
 /* ---- Target vs Achievement ---- */
 
+/*
+ * "Others": achievement (Achieved card rules) that doesn't belong to any sales team,
+ * e.g. deals owned by other users, or GIST HQ deals whose Gist Account Owner has no team.
+ */
+function othersInScope(ownerNames) {
+    return ownerNames.length > 1 || ownerNames.some(isGistHqName);
+}
+
+
+function othersDealMatches(ctx, ownerNames) {
+    if (teamIndexForDeal(ctx) !== -1) return false;
+    if (ownerNames.length === ALLOWED_ACCOUNT_OWNERS.length) return true;   // All Owners: any user
+    return ownerNames.some(function(n) { return n.trim().toLowerCase() === ctx.dealOwnerName.trim().toLowerCase(); });
+}
+
+
+function computeOthers(live, ownerNames, gistSelection) {
+    var o = { achievedFY: 0, achieved: {}, who: {} };
+    QUARTERS.forEach(function(q) { o.achieved[q] = 0; });
+    live.deals.forEach(function(deal) {
+        var ctx = dealContext(deal, live, ALL_QUARTERS, gistSelection, true);
+        if (!ctx || !cardStageMatch(ctx, "achieved") || !othersDealMatches(ctx, ownerNames)) return;
+        o.achievedFY += ctx.amount;
+        o.achieved[ctx.dateQuarters.actual] += ctx.amount;
+        var who = isGistHqName(ctx.dealOwnerName) && ctx.account && ctx.account.gistNames.length
+            ? ctx.account.gistNames.join(", ") : (ctx.dealOwnerName || "Unassigned");
+        o.who[who] = true;
+    });
+    return o;
+}
+
+
 function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter) {
 
     var wrap = document.getElementById("teamTargetWrap");
     if (!wrap) return;
 
     var rows = teamRowsInScope(ownerNames, gistSelection);
+    var showOthers = othersInScope(ownerNames);
+    var others = showOthers ? computeOthers(live, ownerNames, gistSelection) : null;
 
-    if (rows.length === 0) {
+    if (rows.length === 0 && !showOthers) {
         wrap.innerHTML = '<div class="loading">No sales team target is set for this selection. ' +
             'Add it to SALES_TEAM_TARGETS at the top of the widget.</div>';
         return;
@@ -2021,7 +2089,32 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
         });
     });
 
-    if (rows.length > 1) {
+    if (showOthers) {
+        var whoList = Object.keys(others.who).sort();
+        html += '<tr><td class="row-label">Others<span class="sub">' +
+            escapeHtml(whoList.length ? whoList.slice(0, 4).join("; ") + (whoList.length > 4 ? " and " + (whoList.length - 4) + " more" : "") : "No achievement") +
+            '</span></td>';
+        html += '<td>' + formatLakh(0) + '</td>';
+        if (single) {
+            html += '<td>' + formatLakh(0) + '</td>';
+            html += teamAmountCell(others.achieved[selectedQuarter], "team:others:" + selectedQuarter + ":achieved");
+            html += '<td>' + pctBadge(others.achieved[selectedQuarter], 0) + '</td>';
+        } else {
+            html += teamAmountCell(others.achievedFY, "team:others:FY:achieved");
+            html += '<td>' + pctBadge(others.achievedFY, 0) + '</td>';
+            QUARTERS.forEach(function(q) {
+                var a = others.achieved[q];
+                html += '<td class="q-cell' + (a ? ' clickable' : '') + '"' + (a ? ' data-cat="team:others:' + q + ':achieved"' : '') + '>' +
+                    '<span class="big">' + formatLakh(a) + '</span><span class="small">of ' + formatLakh(0) + '</span>' + pctBadge(a, 0) + '</td>';
+            });
+        }
+        html += '</tr>';
+
+        total.fyAchieved += others.achievedFY;
+        QUARTERS.forEach(function(q) { total.qAchieved[q] += others.achieved[q]; });
+    }
+
+    if (rows.length + (showOthers ? 1 : 0) > 1) {
         html += '<tr class="grand-total"><td class="row-label">Total</td><td>' + formatLakh(total.fy) + '</td>';
         if (single) {
             html += '<td>' + formatLakh(total.qTarget[selectedQuarter]) + '</td><td>' +
@@ -2127,9 +2220,6 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
 
     var html = '<div class="eb-summary">';
 
-    html += '<div class="eb-tile" style="border-left-color:#1457b8;"><span class="label">Expected Business</span>' +
-        '<span class="value">' + formatLakh(grandExpected.amount_lakh) + '</span>' +
-        '<span class="sub">' + grandExpected.count + ' deals</span></div>';
 
     html += '<div class="eb-tile" style="border-left-color:#d97706;"><span class="label">Current Pipeline</span>' +
         '<span class="value">' + formatLakh(grandPipeline.amount_lakh) + '</span>' +
@@ -2604,7 +2694,7 @@ function categoryLabel(category) {
     if (parts[0] === "quarter_pipeline") return decodeURIComponent(parts[1]) + " Current Pipeline";
     if (parts[0] === "stage") return decodeURIComponent(parts[1]);
     if (parts[0] === "team") {
-        var row = SALES_TEAM_TARGETS[Number(parts[1])] || { team: "Team" };
+        var row = parts[1] === "others" ? { team: "Others" } : (SALES_TEAM_TARGETS[Number(parts[1])] || { team: "Team" });
         var period = parts[2] === "FY" ? FY_LONG_LABEL : parts[2];
         return row.team + ", " + period + (parts[3] === "pipelineA" ? " Pipeline (Plan A)" : " Achieved");
     }
@@ -2933,12 +3023,14 @@ async function runDrilldown(scope, category) {
     // ---- Target vs Achievement ----
     if (kind === "team") {
 
+        var isOthers = parts[1] === "others";
         var teamIndex = Number(parts[1]);
         var period = parts[2];
 
         live.deals.forEach(function(deal) {
-            var ctx = dealContext(deal, live, ALL_QUARTERS, [], true);
-            if (!ctx || teamIndexForDeal(ctx) !== teamIndex) return;
+            var ctx = dealContext(deal, live, ALL_QUARTERS, isOthers ? gistSelection : [], true);
+            if (!ctx) return;
+            if (isOthers ? !othersDealMatches(ctx, scope.names) : teamIndexForDeal(ctx) !== teamIndex) return;
             var isPipelineA = parts[3] === "pipelineA";
             var dealQuarter = isPipelineA ? ctx.dateQuarters.expected : ctx.dateQuarters.actual;
             if (period !== "FY" && dealQuarter !== period) return;
@@ -2996,6 +3088,7 @@ async function runDrilldown(scope, category) {
 
     var calls = await getCallsForOwners(ownerSet);
     var latest = latestOwnerCalls(accounts, calls);
+    var dealStatus = kind === "bucket" ? computeAccountDealStatus(live, selectedQuarter, gistSelection) : {};
     var matches = [];
 
     accounts.forEach(function(account) {
@@ -3008,7 +3101,11 @@ async function runDrilldown(scope, category) {
         else if (category === "touched") isMatch = !!lastCall;
         else if (kind === "aging") isMatch = age === parts[1];
         else if (kind === "bucket" && account.bucket === decodeURIComponent(parts[1])) {
+            var ds = dealStatus[account.id] || {};
             if (parts[2] === "Total") isMatch = true;
+            else if (parts[2] === "open_deals") isMatch = !!ds.open;
+            else if (parts[2] === "closed_lost") isMatch = !!ds.lost;
+            else if (parts[2] === "closed_won") isMatch = !!ds.won;
             else if (parts[2] === "non_touched") isMatch = !lastCall;
             else isMatch = age === parts[2];
         }
