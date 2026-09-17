@@ -234,7 +234,7 @@ var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2
  * inside the FY (1 Apr - 31 Mar). That date also decides the quarter:
  *   Open stages (pipeline)  -> Expected Order Date
  *   Closed Won (Achieved)   -> Actual Order Date
- *   Payment Received card   -> Payment Date
+ *   Payment Received card   -> Payment Receiving Date (amount = Payment Received Amount)
  *   Payment Pending card    -> Closing Date
  *   Closed Lost             -> Closing Date
  */
@@ -255,14 +255,14 @@ var DEAL_FIELDS = {
     dealType: "",          // Type / a field labelled "Deal Type"
     expectedOrderDate: "", // "Expected Order Date"
     actualOrderDate: "",   // "Actual Order Date"
-    paymentDate: "",       // "Payment Date" / "Payment Received Date"
+    paymentDate: "",       // "Payment Receiving Date"
+    paymentAmount: "",     // "Payment Received Amount" (used by the Payment Received card)
     closingDate: ""        // "Closing Date" (Closing_Date)
 };
 var ACCOUNT_GIST_FIELD = "";   // Accounts: "Gist Account Owner"
 
 /* Extra columns in the top-card popups. "" = auto-detect (Deals field first, then Accounts) */
 var DETAIL_FIELDS = {
-    orderReceivedDate: "",   // "Order Received Date"
     ouCode: "",              // "OU Code"
     subStartDate: ""         // "Sub Start Date" / "Subscription Start Date"
 };
@@ -369,6 +369,7 @@ var liveDataPromise = null;
 var liveResolved = null;
 var fieldInfo = null;
 var amountUnitInUse = "rupees";
+var paymentAmountUnitInUse = "rupees";
 var callsCache = {};
 var aorLive = null;
 var aorGistExpanded = false;
@@ -899,7 +900,7 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
     fieldInfo.actualOrderDate = chooseDateField(DEAL_FIELDS.actualOrderDate,
         [/actual order date/, /actual.*order.*date/], "Actual_Order_Date", dealOptions, deals);
     fieldInfo.paymentDate = chooseDateField(DEAL_FIELDS.paymentDate,
-        [/payment (received )?date/, /payment.*date/], "Payment_Date", dealOptions, deals);
+        [/payment receiv(ing|ed) date/, /payment.*date/], "Payment_Receiving_Date", dealOptions, deals);
     fieldInfo.closingDate = DEAL_FIELDS.closingDate
         ? describeField(DEAL_FIELDS.closingDate, dealOptions, true)
         : (function() {
@@ -921,13 +922,19 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
     fieldInfo.gist = chooseGistField(accountOptions, gistHqAccounts.length ? gistHqAccounts : accounts);
 
     // Extra columns for the top-card detail popups (Deals first, then Accounts)
-    fieldInfo.orderReceivedDate = chooseDetailField(DETAIL_FIELDS.orderReceivedDate,
-        [/order received date/, /order recei?ved.*date/], dealOptions, deals, accountOptions, accounts);
     fieldInfo.ouCode = chooseDetailField(DETAIL_FIELDS.ouCode, [/\bou code\b/, /\bou\b/], dealOptions, deals, accountOptions, accounts);
     fieldInfo.subStartDate = chooseDetailField(DETAIL_FIELDS.subStartDate,
         [/sub(scription)? start date/, /sub(scription)?.*start/], dealOptions, deals, accountOptions, accounts);
 
     amountUnitInUse = decideAmountUnit(scope);
+
+    fieldInfo.paymentAmount = DEAL_FIELDS.paymentAmount
+        ? describeField(DEAL_FIELDS.paymentAmount, dealOptions, true)
+        : (pickByTiers(dealOptions, [
+              function(o) { return /payment receiv(ed|ing) amount/.test(optionText(o)); },
+              function(o) { return /payment.*amount|received amount/.test(optionText(o)); }
+          ], function(api) { return countNonZero(scope, api) || 0.5; }) || describeField("Payment_Received_Amount", dealOptions, false));
+    paymentAmountUnitInUse = decideUnitForField(fieldInfo.paymentAmount, scope);
 
     var scopedAccountIds = {};
     deals.forEach(function(d) {
@@ -1036,6 +1043,26 @@ function decideAmountUnit(deals) {
 
     values.sort(function(a, b) { return a - b; });
     return values[Math.floor(values.length / 2)] < 1000 ? "lakh" : "rupees";
+}
+
+
+function decideUnitForField(field, deals) {
+    if (AMOUNT_UNIT === "lakh" || AMOUNT_UNIT === "rupees") return AMOUNT_UNIT;
+    if (/lakh|\blac\b/i.test(field.label + " " + field.api)) return "lakh";
+    var values = [];
+    deals.forEach(function(deal) {
+        var v = Math.abs(parseNumber(deal[field.api]));
+        if (v) values.push(v);
+    });
+    if (!values.length) return "rupees";
+    values.sort(function(a, b) { return a - b; });
+    return values[Math.floor(values.length / 2)] < 1000 ? "lakh" : "rupees";
+}
+
+
+function paymentAmountLakh(deal) {
+    var raw = parseNumber(deal ? deal[fieldInfo.paymentAmount.api] : null);
+    return paymentAmountUnitInUse === "lakh" ? raw : raw / 100000;
 }
 
 
@@ -1198,6 +1225,7 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
         selectedQuarter: allQuarters ? ALL_QUARTERS : selectedQuarter,
         stage: String(deal.Stage || "").trim() || "Unknown",
         amount: dealAmountLakh(deal),
+        paymentAmount: paymentAmountLakh(deal),
         plan: dealPlanName(deal),
         products: fieldValueList(deal[fieldInfo.product.api]),
         dealOwnerId: ddLookupId(deal.Owner),
@@ -1275,6 +1303,12 @@ function cardStageMatch(ctx, category, ignoreDate) {
 }
 
 
+/* Payment Received card adds up Payment Received Amount; the other cards use Expected Business */
+function cardAmount(ctx, category) {
+    return category === "payment_received" ? ctx.paymentAmount : ctx.amount;
+}
+
+
 /* Charts and summary: scoped to the ACCOUNT owner */
 function matchesAccountOwner(ctx, ownerSet) {
     return !!ctx.account && !!ownerSet[ctx.account.ownerId];
@@ -1332,7 +1366,7 @@ function computeDealMetrics(live, ownerSet, gistSelection, selectedQuarter) {
 
         CARD_CATEGORIES.forEach(function(category) {
             if (!matchesCardCategory(ctx, category, ownerSet)) return;
-            m.cards[category] += ctx.amount;
+            m.cards[category] += cardAmount(ctx, category);
             if (category === "current_pipeline") m.pipelineAccounts[ctx.accId] = true;
         });
 
@@ -1340,7 +1374,7 @@ function computeDealMetrics(live, ownerSet, gistSelection, selectedQuarter) {
         if (ownerSet[ctx.dealOwnerId] && ctx.selectedQuarter === ALL_QUARTERS) {
             CARD_CATEGORIES.forEach(function(category) {
                 if (!cardStageMatch(ctx, category) && cardStageMatch(ctx, category, true)) {
-                    m.leftOut[category].amount_lakh += ctx.amount;
+                    m.leftOut[category].amount_lakh += cardAmount(ctx, category);
                     m.leftOut[category].count += 1;
                 }
             });
@@ -1842,7 +1876,7 @@ function updateAmountCards(cards, targetLakh, pipelineAccounts, leftOut) {
 
     var dateNames = {
         achieved: "Actual Order Date",
-        payment_received: "Payment Date",
+        payment_received: "Payment Receiving Date",
         payment_pending: "Closing Date",
         current_pipeline: "Expected Order Date"
     };
@@ -2176,7 +2210,8 @@ function dataSourceNotes(m, live, missingOwners) {
         '), Deal Type = ' + escapeHtml(f.dealType.label) + ' (' + escapeHtml(f.dealType.api) +
         '), Expected Order Date = ' + escapeHtml(f.expectedOrderDate.api) +
         ', Actual Order Date = ' + escapeHtml(f.actualOrderDate.api) +
-        ', Payment Date = ' + escapeHtml(f.paymentDate.api) +
+        ', Payment Receiving Date = ' + escapeHtml(f.paymentDate.api) +
+        ', Payment Received Amount = ' + escapeHtml(f.paymentAmount.api) + ' (read as ' + paymentAmountUnitInUse + ')' +
         ', Closing Date = ' + escapeHtml(f.closingDate.api) +
         '), Year = ' + escapeHtml(f.year.label) + ' (' + escapeHtml(f.year.api) +
         '), Gist Account Owner = ' + escapeHtml(f.gist.label) + ' (' + escapeHtml(f.gist.api) + ').</div>';
@@ -2184,7 +2219,8 @@ function dataSourceNotes(m, live, missingOwners) {
     var warnings = [];
 
     [["expectedOrderDate", "Expected Order Date"], ["actualOrderDate", "Actual Order Date"],
-     ["paymentDate", "Payment Date"], ["closingDate", "Closing Date"]].forEach(function(pair) {
+     ["paymentDate", "Payment Receiving Date"], ["paymentAmount", "Payment Received Amount"],
+     ["closingDate", "Closing Date"]].forEach(function(pair) {
         if (!f[pair[0]].found) {
             warnings.push('No "' + pair[1] + '" field was found on Deals, so everything that depends on it shows 0. ' +
                 'Set <code>DEAL_FIELDS.' + pair[0] + '</code> to its API name.');
@@ -2675,8 +2711,8 @@ function detailTable(columns, rows, summaryHtml) {
 var CARD_LOGIC = {
     achieved: { dateKey: "actualOrderDate", dateTitle: "Actual Order Date", quarterKey: "actual",
         rule: "Closed Won stage, Deal Type New, Deal Year " + FY_FILTER + ", Actual Order Date in FY, deal owner selected, test deals left out" },
-    payment_received: { dateKey: "paymentDate", dateTitle: "Payment Date", quarterKey: "payment",
-        rule: "Payment Received / Part Payment Received / Short Payment, Deal Type New, Deal Year " + FY_FILTER + ", Payment Date in FY, deal owner selected, test deals left out" },
+    payment_received: { dateKey: "paymentDate", dateTitle: "Payment Receiving Date", quarterKey: "payment",
+        rule: "Payment Received / Part Payment Received / Short Payment, Deal Type New, Deal Year " + FY_FILTER + ", Payment Receiving Date in FY, deal owner selected, test deals left out. Amount = Payment Received Amount" },
     payment_pending: { dateKey: "closingDate", dateTitle: "Closing Date", quarterKey: "closing",
         rule: "Email Confirmation / PI Sent - Order Received, Deal Type New, Deal Year " + FY_FILTER + ", Closing Date in FY, deal owner selected" },
     current_pipeline: { dateKey: "expectedOrderDate", dateTitle: "Expected Order Date", quarterKey: "expected",
@@ -2727,7 +2763,7 @@ async function runCardDetail(scope, category) {
             var ctx = dealContext(deal, live, selectedQuarter, gistSelection, true);
             if (!ctx || !matchesCardCategory(ctx, category, ownerSet)) return;
 
-            total += ctx.amount;
+            total += cardAmount(ctx, category);
             accountSet[ctx.accId] = true;
 
             rows.push({
@@ -2739,7 +2775,8 @@ async function runCardDetail(scope, category) {
                 stage: escapeHtml(ctx.stage),
                 logicDate: fmtDate(fieldValueText(deal[fieldInfo[logic.dateKey].api])) + " (" + (ctx.dateQuarters[logic.quarterKey] || "—") + ")",
                 expectedBusiness: formatLakh(ctx.amount),
-                orderReceivedDate: detailValue(fieldInfo.orderReceivedDate, deal, ctx.account),
+                paymentReceivedAmount: formatLakh(ctx.paymentAmount),
+                paymentReceivingDate: fmtDate(fieldValueText(deal[fieldInfo.paymentDate.api])),
                 ouCode: detailValue(fieldInfo.ouCode, deal, ctx.account),
                 subStartDate: detailValue(fieldInfo.subStartDate, deal, ctx.account),
                 dealYear: escapeHtml(dealFiscalYear(deal) || "—"),
@@ -2759,9 +2796,16 @@ async function runCardDetail(scope, category) {
         if (category === "current_pipeline") cols.push({ key: "accountOwner", title: "Account Owner", left: true, logic: true });
         cols = cols.concat([
             { key: "stage", title: "Stage", left: true, logic: true },
-            { key: "logicDate", title: logic.dateTitle + " (Quarter)", logic: true },
-            { key: "expectedBusiness", title: "Expected Business" },
-            { key: "orderReceivedDate", title: "Order Received Date" },
+            { key: "logicDate", title: logic.dateTitle + " (Quarter)", logic: true }
+        ]);
+        if (category === "payment_received") {
+            cols.push({ key: "paymentReceivedAmount", title: "Payment Received Amount", logic: true });
+            cols.push({ key: "expectedBusiness", title: "Expected Business" });
+        } else {
+            cols.push({ key: "expectedBusiness", title: "Expected Business", logic: true });
+            cols.push({ key: "paymentReceivingDate", title: "Payment Receiving Date" });
+        }
+        cols = cols.concat([
             { key: "ouCode", title: "OU Code" },
             { key: "subStartDate", title: "Sub Start Date" },
             { key: "dealYear", title: "Deal Year", logic: true },
@@ -2816,7 +2860,7 @@ async function runCardDetail(scope, category) {
             daysSince: lastCall ? String(Math.floor((now - lastCall) / 86400000)) : "—",
             status: status,
             expectedBusiness: formatLakh(eb),
-            orderReceivedDate: detailValue(fieldInfo.orderReceivedDate, ref, account),
+            paymentReceivingDate: ref ? fmtDate(fieldValueText(ref[fieldInfo.paymentDate.api])) : "—",
             ouCode: detailValue(fieldInfo.ouCode, ref, account),
             subStartDate: detailValue(fieldInfo.subStartDate, ref, account)
         });
@@ -2836,7 +2880,7 @@ async function runCardDetail(scope, category) {
         { key: "status", title: "Status", left: true, logic: category !== "total_accounts" },
         { key: "bucket", title: "Bucket", left: true },
         { key: "expectedBusiness", title: "Expected Business (" + FY_SHORT_LABEL + ")" },
-        { key: "orderReceivedDate", title: "Order Received Date" },
+        { key: "paymentReceivingDate", title: "Payment Receiving Date" },
         { key: "ouCode", title: "OU Code" },
         { key: "subStartDate", title: "Sub Start Date" }
     ]);
@@ -2849,7 +2893,7 @@ async function runCardDetail(scope, category) {
 
     var summaryA = '<div class="modal-summary"><strong>' + accountsLabel(rowsA.length) + '</strong>, Expected Business <strong>' +
         formatLakh(ebTotal) + '</strong>.<br>Rule: ' + escapeHtml(ruleA) + '. Expected Business is the sum of the account\'s Deal Type New ' +
-        'deals with Deal Year ' + FY_FILTER + '; Order Received Date, OU Code and Sub Start Date come from the account, or from its latest ' +
+        'deals with Deal Year ' + FY_FILTER + '; Payment Receiving Date comes from its latest Deal Type New deal; OU Code and Sub Start Date come from the account, or from its latest ' +
         'Deal Type New deal when the field is on Deals.' + missingDetailNote() + '</div>';
 
     return detailTable(colsA, rowsA, summaryA);
@@ -2857,7 +2901,7 @@ async function runCardDetail(scope, category) {
 
 
 function missingDetailNote() {
-    var missing = [["orderReceivedDate", "Order Received Date"], ["ouCode", "OU Code"], ["subStartDate", "Sub Start Date"]]
+    var missing = [["paymentDate", "Payment Receiving Date"], ["paymentAmount", "Payment Received Amount"], ["ouCode", "OU Code"], ["subStartDate", "Sub Start Date"]]
         .filter(function(pair) { return !fieldInfo[pair[0]].found; })
         .map(function(pair) { return pair[1]; });
     return missing.length ? '<br><span style="color:#b45309;">Not found in CRM: ' + missing.join(", ") +
