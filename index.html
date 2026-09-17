@@ -240,7 +240,14 @@ var DEAL_FIELDS = {
 };
 var ACCOUNT_GIST_FIELD = "";   // Accounts: "Gist Account Owner"
 
-var AMOUNT_UNIT = "auto";      // "rupees", "lakh" or "auto"
+var AMOUNT_UNIT = "auto";
+
+/*
+ * Achieved / Payment Received / Payment Pending: which quarter a won deal
+ * belongs to. Expected Order Date first; if that is blank or outside the FY,
+ * these fields are tried in order.
+ */
+var ACHIEVED_DATE_FALLBACK_FIELDS = ["Closing_Date"];      // "rupees", "lakh" or "auto"
 
 /* Knimbus Default is left out of: the Current Pipeline card, Quarter x Plan, and the Stage-wise funnel */
 var EXCLUDED_PRODUCTS = ["Knimbus Default"];
@@ -1079,7 +1086,15 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 
     var quarter = inWindow ? monthQuarter(closingDate) : null;
     var allQuarters = !selectedQuarter || selectedQuarter === ALL_QUARTERS;
-    if (!allQuarters && quarter !== selectedQuarter) return null;
+    if (!cardMode && !allQuarters && quarter !== selectedQuarter) return null;
+
+    // Quarter for won deals: Expected Order Date, else the fallback date fields
+    var wonDate = inWindow ? closingDate : null;
+    var wonDateField = inWindow ? fieldInfo.closingDate.label : "";
+    for (var f = 0; !wonDate && f < ACHIEVED_DATE_FALLBACK_FIELDS.length; f++) {
+        var candidate = ddParseDate(deal[ACHIEVED_DATE_FALLBACK_FIELDS[f]]);
+        if (isInFyWindow(candidate)) { wonDate = candidate; wonDateField = ACHIEVED_DATE_FALLBACK_FIELDS[f]; }
+    }
 
     var account = live.accountsById[accId] || null;
     if (!accountMatchesGist(account, gistSelection)) return null;
@@ -1090,6 +1105,11 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
         accName: account ? account.name : ddLookupName(deal.Account_Name, "(Unnamed Account)"),
         quarter: quarter,
         inWindow: inWindow,
+        wonQuarter: wonDate ? monthQuarter(wonDate) : null,
+        wonDateField: wonDateField,
+        selectedQuarter: allQuarters ? ALL_QUARTERS : selectedQuarter,
+        dateSummary: fieldInfo.closingDate.label + ": " + (deal[fieldInfo.closingDate.api] || "blank") +
+            ACHIEVED_DATE_FALLBACK_FIELDS.map(function(api) { return ", " + api.replace(/_/g, " ") + ": " + (deal[api] || "blank"); }).join(""),
         stage: String(deal.Stage || "").trim() || "Unknown",
         amount: dealAmountLakh(deal),
         plan: dealPlanName(deal),
@@ -1143,10 +1163,15 @@ function cardStageMatch(ctx, category) {
 
     if (isRemovedStage(ctx.stage)) return false;
 
-    if (category === "achieved") return isClosedWonStage(ctx.stage) && !ctx.excluded;
-    if (category === "payment_received") return PAYMENT_RECEIVED_KEYS.indexOf(normStage(ctx.stage)) !== -1 && !ctx.excluded;
-    if (category === "payment_pending") return PAYMENT_PENDING_KEYS.indexOf(normStage(ctx.stage)) !== -1;
+    var quarterPicked = ctx.selectedQuarter && ctx.selectedQuarter !== ALL_QUARTERS;
+    var wonQuarterOk = !quarterPicked || ctx.wonQuarter === ctx.selectedQuarter;
+
+    if (category === "achieved") return wonQuarterOk && isClosedWonStage(ctx.stage) && !ctx.excluded;
+    if (category === "payment_received") return wonQuarterOk && PAYMENT_RECEIVED_KEYS.indexOf(normStage(ctx.stage)) !== -1 && !ctx.excluded;
+    if (category === "payment_pending") return wonQuarterOk && PAYMENT_PENDING_KEYS.indexOf(normStage(ctx.stage)) !== -1;
     if (category === "current_pipeline" || category === "current_pipeline_all_products") {
+        if (REQUIRE_CLOSING_DATE_IN_FY && !ctx.inWindow) return false;   // Expected Order Date must be in the FY
+        if (quarterPicked && ctx.quarter !== ctx.selectedQuarter) return false;
         if (!isPipelineDeal(ctx, category === "current_pipeline")) return false;
         return !PIPELINE_REQUIRE_SAME_OWNER || (!!ctx.account && ctx.account.ownerId === ctx.dealOwnerId);
     }
@@ -1191,6 +1216,7 @@ function computeDealMetrics(live, ownerSet, gistSelection, selectedQuarter) {
         groupStages: {},
         cards: { achieved: 0, payment_received: 0, payment_pending: 0, current_pipeline: 0 },
         pipelineAccounts: {},
+        pipelineOutsideFY: { amount_lakh: 0, count: 0 },
         pipelineTableAccounts: {},
         chartDeals: 0,
         dealsWithAmount: 0,
@@ -1213,7 +1239,14 @@ function computeDealMetrics(live, ownerSet, gistSelection, selectedQuarter) {
             if (category === "current_pipeline") m.pipelineAccounts[ctx.accId] = true;
         });
 
+        if (!ctx.inWindow && ownerSet[ctx.dealOwnerId] &&
+            matchesCardCategory(Object.assign({}, ctx, { inWindow: true }), "current_pipeline", ownerSet)) {
+            m.pipelineOutsideFY.amount_lakh += ctx.amount;
+            m.pipelineOutsideFY.count += 1;
+        }
+
         if (!chartEligible(ctx)) return;
+        if (ctx.selectedQuarter !== ALL_QUARTERS && ctx.quarter !== ctx.selectedQuarter) return;
         if (!matchesAccountOwner(ctx, ownerSet)) return;
 
         m.chartDeals++;
@@ -1292,7 +1325,7 @@ function teamIndexForDeal(ctx) {
 function computeTeamMetrics(live) {
 
     var teams = SALES_TEAM_TARGETS.map(function() {
-        var t = { achievedFY: 0, achieved: {}, pipelineA: {} };
+        var t = { achievedFY: 0, achieved: {}, pipelineA: {}, noDate: 0 };
         QUARTERS.forEach(function(q) { t.achieved[q] = 0; t.pipelineA[q] = 0; });
         return t;
     });
@@ -1307,7 +1340,8 @@ function computeTeamMetrics(live) {
 
         if (cardStageMatch(ctx, "achieved")) {
             teams[index].achievedFY += ctx.amount;
-            if (ctx.quarter) teams[index].achieved[ctx.quarter] += ctx.amount;
+            if (ctx.wonQuarter) teams[index].achieved[ctx.wonQuarter] += ctx.amount;
+            else teams[index].noDate += ctx.amount;
         }
 
         if (ctx.quarter && cardStageMatch(ctx, "current_pipeline_all_products") && ctx.plan.trim().toLowerCase() === "plan a") {
@@ -1566,7 +1600,7 @@ function renderAll() {
 
             var metrics = computeDealMetrics(live, owners.set, gistSelection, selectedQuarter);
 
-            updateAmountCards(metrics.cards, target, metrics.pipelineAccounts);
+            updateAmountCards(metrics.cards, target, metrics.pipelineAccounts, metrics.pipelineOutsideFY);
             renderTeamTable(computeTeamMetrics(live), live, ownerNames, gistSelection, selectedQuarter);
             renderExpectedBusiness(metrics, live, targets, owners.missing);
             renderStageFunnel(metrics);
@@ -1704,13 +1738,18 @@ function formatLakh(value) {
 }
 
 
-function updateAmountCards(cards, targetLakh, pipelineAccounts) {
+function updateAmountCards(cards, targetLakh, pipelineAccounts, pipelineOutsideFY) {
     CARD_CATEGORIES.forEach(function(category) {
         setCardValue(category, formatLakh(cards[category]));
     });
     setCardSub("achieved", targetShareSub(cards.achieved, targetLakh));
     setCardSub("payment_received", targetShareSub(cards.payment_received, targetLakh));
-    setCardSub("current_pipeline", '<strong>' + accountsLabel(Object.keys(pipelineAccounts || {}).length) + '</strong>');
+    var pipelineSub = '<strong>' + accountsLabel(Object.keys(pipelineAccounts || {}).length) + '</strong>';
+    if (pipelineOutsideFY && pipelineOutsideFY.count) {
+        pipelineSub += '<br>' + formatLakh(pipelineOutsideFY.amount_lakh) + ' (' + pipelineOutsideFY.count +
+            (pipelineOutsideFY.count === 1 ? ' deal' : ' deals') + ') left out: Expected Order Date not in ' + FY_LONG_LABEL;
+    }
+    setCardSub("current_pipeline", pipelineSub);
 }
 
 
@@ -1792,6 +1831,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
     html += '<th>Monthly Target</th><th>Pipeline (Plan A, ' + pipelineQuarter + ')</th></tr></thead><tbody>';
 
     var total = { fy: 0, fyAchieved: 0, qTarget: {}, qAchieved: {}, month: 0, pipelineA: 0 };
+    var noDateTeams = [];
     QUARTERS.forEach(function(q) { total.qTarget[q] = 0; total.qAchieved[q] = 0; });
 
     rows.forEach(function(item) {
@@ -1799,7 +1839,6 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
         var row = item.row;
         var t = teams[item.index];
         var fyAchieved = t.achievedFY;
-        var inQuarters = QUARTERS.reduce(function(s, q) { return s + t.achieved[q]; }, 0);
         var idx = item.index;
 
         html += '<tr><td class="row-label">' + escapeHtml(row.team) +
@@ -1813,8 +1852,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
             html += teamAmountCell(qa, "team:" + idx + ":" + selectedQuarter + ":achieved");
             html += '<td>' + pctBadge(qa, qt) + '</td>';
         } else {
-            html += teamAmountCell(fyAchieved, "team:" + idx + ":FY:achieved",
-                fyAchieved - inQuarters > 0.005 ? formatLakh(fyAchieved - inQuarters) + " has no Expected Order Date in the FY" : "");
+            html += teamAmountCell(fyAchieved, "team:" + idx + ":FY:achieved");
             html += '<td>' + pctBadge(fyAchieved, teamFyTarget(row)) + '</td>';
             QUARTERS.forEach(function(q) {
                 var target = teamQuarterTarget(row, q);
@@ -1829,6 +1867,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
         html += '<td>' + formatLakh(row.monthTarget || 0) + '</td>';
         html += teamAmountCell(t.pipelineA[pipelineQuarter], "team:" + idx + ":" + pipelineQuarter + ":pipelineA");
         html += '</tr>';
+        if (t.noDate > 0.005) noDateTeams.push({ team: row.team, idx: idx, amount: t.noDate });
 
         total.fy += teamFyTarget(row);
         total.fyAchieved += fyAchieved;
@@ -1860,8 +1899,19 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
     html += '</tbody></table></div>';
 
     html += '<div class="data-source">Achieved uses the same rules as the Achieved card: deal owner, Closed Won stages, ' +
-        'Deal Type New, Deal Year ' + FY_FILTER + '. FY Achieved matches the card with All Quarters; each quarter uses the ' +
+        'Deal Type New, Deal Year ' + FY_FILTER + '. FY Achieved matches the card with All Quarters. Each quarter uses the ' +
+        'Expected Order Date, or ' + ACHIEVED_DATE_FALLBACK_FIELDS.map(function(a) { return a.replace(/_/g, " "); }).join(" / ") +
+        ' when the Expected Order Date is blank or outside ' + FY_LONG_LABEL + '. ' +
         'deal\'s Expected Order Date. ' + GIST_HQ_OWNER_NAME + ' deals are split into teams by the account\'s Gist Account Owner.</div>';
+
+    if (noDateTeams.length) {
+        html += '<div class="warn-note">Achieved but not in any quarter (no Expected Order Date or ' +
+            ACHIEVED_DATE_FALLBACK_FIELDS.map(function(a) { return a.replace(/_/g, " "); }).join(" / ") + ' inside ' + FY_LONG_LABEL + '): ' +
+            noDateTeams.map(function(n) {
+                return '<span class="clickable plain" style="cursor:pointer;" data-cat="team:' + n.idx + ':NODATE:achieved">' +
+                    escapeHtml(n.team) + ' ' + formatLakh(n.amount) + '</span>';
+            }).join(", ") + '. Click a name to see the deals and their dates.</div>';
+    }
 
     var unmatched = live.gistValues.filter(function(name) {
         if (name === GIST_NOT_ASSIGNED) return false;
@@ -2414,7 +2464,7 @@ function categoryLabel(category) {
     if (parts[0] === "stage") return decodeURIComponent(parts[1]);
     if (parts[0] === "team") {
         var row = SALES_TEAM_TARGETS[Number(parts[1])] || { team: "Team" };
-        var period = parts[2] === "FY" ? FY_LONG_LABEL : parts[2];
+        var period = parts[2] === "FY" ? FY_LONG_LABEL : (parts[2] === "NODATE" ? "not in any quarter" : parts[2]);
         return row.team + ", " + period + (parts[3] === "pipelineA" ? " Pipeline (Plan A)" : " Achieved");
     }
 
@@ -2484,8 +2534,16 @@ async function runDrilldown(scope, category) {
         live.deals.forEach(function(deal) {
             var ctx = dealContext(deal, live, ALL_QUARTERS, [], true);
             if (!ctx || teamIndexForDeal(ctx) !== teamIndex) return;
-            if (period !== "FY" && ctx.quarter !== period) return;
-            var ok = parts[3] === "pipelineA"
+            var isPipelineA = parts[3] === "pipelineA";
+            var dealQuarter = isPipelineA ? ctx.quarter : ctx.wonQuarter;
+            if (period === "NODATE") {
+                if (!isPipelineA && !ctx.wonQuarter && cardStageMatch(ctx, "achieved")) {
+                    unique[ctx.accId + ":" + deal.id] = ctx.accName + " (" + formatLakh(ctx.amount) + "; " + ctx.dateSummary + ")";
+                }
+                return;
+            }
+            if (period !== "FY" && dealQuarter !== period) return;
+            var ok = isPipelineA
                 ? cardStageMatch(ctx, "current_pipeline_all_products") && ctx.plan.trim().toLowerCase() === "plan a"
                 : cardStageMatch(ctx, "achieved");
             if (ok) unique[ctx.accId] = ctx.accName;
