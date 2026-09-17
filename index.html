@@ -91,9 +91,19 @@
         .card-value.clickable, td.clickable .big, td.clickable.plain { text-decoration: underline; text-decoration-style: dotted; text-decoration-color: #93c5fd; }
         .card-value.clickable:hover, td.clickable:hover { opacity: 0.75; }
 
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
-        .modal-overlay.open { display: flex; }
-        .modal-box { background: #ffffff; border-radius: 10px; max-width: 500px; width: 90%; max-height: 70vh; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        /* The widget iframe can be taller than the screen, so the popup opens where you clicked */
+        .modal-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; background: rgba(0,0,0,0.35); z-index: 100; }
+        .modal-overlay.open { display: block; }
+        .modal-box { position: absolute; left: 50%; transform: translateX(-50%); background: #ffffff; border-radius: 10px;
+            max-width: 520px; width: 92%; max-height: 560px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.25); }
+        .modal-box.wide { max-width: 1240px; width: 97%; max-height: 640px; }
+        .modal-summary { font-size: 12px; color: #374151; margin-bottom: 8px; line-height: 1.5; }
+        .modal-summary strong { color: #111827; }
+        .detail-table th, .detail-table td { font-size: 12px; padding: 6px 8px; white-space: nowrap; }
+        .detail-table th { position: sticky; top: 0; z-index: 1; }
+        .detail-table td.left { text-align: left; }
+        .detail-table td.logic { background: #fff7e6; font-weight: 600; }
+        .detail-table th.logic { background: #b45309; }
         .modal-header { padding: 16px 20px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; }
         .modal-header h3 { margin: 0; font-size: 16px; color: #1f2937; }
         .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #6b7280; line-height: 1; }
@@ -200,8 +210,8 @@
 
 </div>
 
-<div class="modal-overlay" id="drilldownModal">
-    <div class="modal-box">
+<div class="modal-overlay" id="drilldownModal" onclick="if (event.target === this) closeDrilldown()">
+    <div class="modal-box" id="drilldownBox">
         <div class="modal-header">
             <h3 id="drilldownTitle">Records</h3>
             <button class="modal-close" onclick="closeDrilldown()">&times;</button>
@@ -249,6 +259,13 @@ var DEAL_FIELDS = {
     closingDate: ""        // "Closing Date" (Closing_Date)
 };
 var ACCOUNT_GIST_FIELD = "";   // Accounts: "Gist Account Owner"
+
+/* Extra columns in the top-card popups. "" = auto-detect (Deals field first, then Accounts) */
+var DETAIL_FIELDS = {
+    orderReceivedDate: "",   // "Order Received Date"
+    ouCode: "",              // "OU Code"
+    subStartDate: ""         // "Sub Start Date" / "Subscription Start Date"
+};
 
 var AMOUNT_UNIT = "auto";      // "rupees", "lakh" or "auto"
 
@@ -357,6 +374,9 @@ var aorLive = null;
 var aorGistExpanded = false;
 
 populateQuarterFilter();
+
+var lastClickY = 0;
+document.addEventListener("click", function(event) { lastClickY = event.pageY || 0; }, true);
 
 ZOHO.embeddedApp.on("PageLoad", function() { loadReport(); });
 ZOHO.embeddedApp.init();
@@ -769,6 +789,20 @@ function valueIsNewDealType(value) {
 }
 
 
+function chooseDetailField(explicit, patterns, dealOptions, deals, accountOptions, accounts) {
+    var tiers = patterns.map(function(re) { return function(o) { return re.test(optionText(o)); }; });
+    if (explicit) {
+        var onDeals = dealOptions.some(function(o) { return o.api === explicit; });
+        return { module: onDeals ? "Deals" : "Accounts", api: explicit, label: explicit, found: true };
+    }
+    var d = pickByTiers(dealOptions, tiers, function(api) { return countNonEmpty(deals, api) || 0.5; });
+    if (d) return { module: "Deals", api: d.api, label: d.label, found: true };
+    var a = pickByTiers(accountOptions, tiers, function(api) { return countNonEmpty(accounts, api) || 0.5; });
+    if (a) return { module: "Accounts", api: a.api, label: a.label, found: true };
+    return { module: "", api: "", label: "", found: false };
+}
+
+
 function chooseDateField(explicit, patterns, fallbackApi, options, deals) {
     if (explicit) return describeField(explicit, options, true);
     var tiers = patterns.map(function(re) { return function(o) { return re.test(optionText(o)); }; });
@@ -886,6 +920,13 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
     var gistHqAccounts = accounts.filter(function(a) { return isGistHqName(ddLookupName(a.Owner, "")); });
     fieldInfo.gist = chooseGistField(accountOptions, gistHqAccounts.length ? gistHqAccounts : accounts);
 
+    // Extra columns for the top-card detail popups (Deals first, then Accounts)
+    fieldInfo.orderReceivedDate = chooseDetailField(DETAIL_FIELDS.orderReceivedDate,
+        [/order received date/, /order recei?ved.*date/], dealOptions, deals, accountOptions, accounts);
+    fieldInfo.ouCode = chooseDetailField(DETAIL_FIELDS.ouCode, [/\bou code\b/, /\bou\b/], dealOptions, deals, accountOptions, accounts);
+    fieldInfo.subStartDate = chooseDetailField(DETAIL_FIELDS.subStartDate,
+        [/sub(scription)? start date/, /sub(scription)?.*start/], dealOptions, deals, accountOptions, accounts);
+
     amountUnitInUse = decideAmountUnit(scope);
 
     var scopedAccountIds = {};
@@ -916,7 +957,8 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
             ownerName: ownerName,
             bucket: fieldValueText(a.Bucket_Type) || "No Bucket",
             gistNames: gistNames,
-            inScope: !!scopedAccountIds[String(a.id)]
+            inScope: !!scopedAccountIds[String(a.id)],
+            raw: a
         };
 
         account.teamIndex = assignTeam(account);
@@ -939,8 +981,17 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts) {
         return !isRemovedStage(d.Stage) && !stageDateQuarter(d);
     }).length;
 
+    var newDealsByAccount = {};
+    deals.forEach(function(d) {
+        if (!dealTypeOk(d)) return;
+        var accId = ddLookupId(d.Account_Name);
+        if (!accId) return;
+        (newDealsByAccount[accId] = newDealsByAccount[accId] || []).push(d);
+    });
+
     return {
         deals: deals,
+        newDealsByAccount: newDealsByAccount,
         accountsById: accountsById,
         ownerIdByName: ownerIdByName,
         gistValues: gistValues,
@@ -1600,7 +1651,7 @@ function renderAll() {
     var html = "";
 
     html += '<div class="card-row">';
-    html += cardHtml("Target (" + (allQuarters ? FY_LONG_LABEL : selectedQuarter) + ")", formatLakh(target), "target", null, escapeHtml(targetSub));
+    html += cardHtml("Target (" + (allQuarters ? FY_LONG_LABEL : selectedQuarter) + ")", formatLakh(target), "target", "target", escapeHtml(targetSub));
     html += cardHtml("Achieved (Closed Won)", "Calculating...", "achieved waiting", "achieved");
     html += cardHtml("Payment Received", "Calculating...", "achieved waiting", "payment_received");
     html += cardHtml("Payment Pending", "Calculating...", "pending waiting", "payment_pending");
@@ -1874,7 +1925,6 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
     }
 
     var single = selectedQuarter !== ALL_QUARTERS;
-    var pipelineQuarter = single ? selectedQuarter : currentFyQuarter();
     var nowQuarter = currentFyQuarter();
 
     var html = '<div class="table-scroll"><table class="team-table"><thead><tr>';
@@ -1890,7 +1940,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
         });
     }
 
-    html += '<th>Monthly Target</th><th>Pipeline (Plan A, ' + pipelineQuarter + ')</th></tr></thead><tbody>';
+    html += '</tr></thead><tbody>';
 
     var total = { fy: 0, fyAchieved: 0, qTarget: {}, qAchieved: {}, month: 0, pipelineA: 0 };
 
@@ -1926,15 +1976,11 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
             });
         }
 
-        html += '<td>' + formatLakh(row.monthTarget || 0) + '</td>';
-        html += teamAmountCell(t.pipelineA[pipelineQuarter], "team:" + idx + ":" + pipelineQuarter + ":pipelineA");
         html += '</tr>';
 
 
         total.fy += teamFyTarget(row);
         total.fyAchieved += fyAchieved;
-        total.month += Number(row.monthTarget || 0);
-        total.pipelineA += t.pipelineA[pipelineQuarter];
         QUARTERS.forEach(function(q) {
             total.qTarget[q] += teamQuarterTarget(row, q);
             total.qAchieved[q] += t.achieved[q];
@@ -1955,14 +2001,14 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
                     pctBadge(total.qAchieved[q], total.qTarget[q]) + '</td>';
             });
         }
-        html += '<td>' + formatLakh(total.month) + '</td><td>' + formatLakh(total.pipelineA) + '</td></tr>';
+        html += '</tr>';
     }
 
     html += '</tbody></table></div>';
 
     html += '<div class="data-source">Achieved uses the Achieved card rules: deal owner, Closed Won stages, Deal Type New, ' +
         'Deal Year ' + FY_FILTER + ' and Actual Order Date in ' + FY_LONG_LABEL + ' (the quarter comes from the Actual Order Date). ' +
-        'Pipeline (Plan A) uses open stages with Expected Order Date in the quarter. ' + GIST_HQ_OWNER_NAME +
+        GIST_HQ_OWNER_NAME +
         ' deals are split into teams by the account\'s Gist Account Owner.</div>';
 
     var unmatched = live.gistValues.filter(function(name) {
@@ -2498,6 +2544,7 @@ function attachDrilldownHandlers() {
 function categoryLabel(category) {
 
     var labels = {
+        "target": "Target",
         "achieved": "Achieved (Closed Won)",
         "payment_received": "Payment Received",
         "payment_pending": "Payment Pending",
@@ -2530,35 +2577,291 @@ function categoryLabel(category) {
 }
 
 
+var CARD_DETAIL_CATEGORIES = ["target", "achieved", "payment_received", "payment_pending",
+    "total_accounts", "untouched", "touched", "current_pipeline"];
+
+
 function openDrilldown(scope, category) {
 
     var modal = document.getElementById("drilldownModal");
+    var box = document.getElementById("drilldownBox");
     var title = document.getElementById("drilldownTitle");
     var body = document.getElementById("drilldownBody");
+    var isDetail = CARD_DETAIL_CATEGORIES.indexOf(category) !== -1;
 
     var isTeam = category.indexOf("team:") === 0;
-    title.innerText = (isTeam ? "" : scope.label + " - ") + categoryLabel(category);
+    title.innerText = (isTeam ? "" : scope.label + " - ") + categoryLabel(category) +
+        (isDetail ? " (" + periodLabel(currentQuarterSelection()) + ")" : "");
     body.innerHTML = "Loading...";
+
+    box.classList.toggle("wide", isDetail);
+    positionModal(modal, box);
     modal.classList.add("open");
 
-    runDrilldown(scope, category)
+    var work = isDetail ? runCardDetail(scope, category) : runDrilldown(scope, category).then(renderNameList);
 
-        .then(function(names) {
-
-            if (!names || names.length === 0) {
-                body.innerHTML = '<div class="modal-empty">No matching records found.</div>';
-                return;
-            }
-
-            var html = '<div class="modal-count">' + accountsLabel(names.length) + '</div><ul>';
-            names.forEach(function(name) { html += "<li>" + escapeHtml(name) + "</li>"; });
-            body.innerHTML = html + "</ul>";
+    work
+        .then(function(html) {
+            body.innerHTML = html;
+            positionModal(modal, box);
         })
-
         .catch(function(err) {
             body.innerHTML = '<div class="modal-empty">Failed to load records.</div>';
             console.error("Drilldown error:", err);
         });
+}
+
+
+/* Place the popup near the click, kept inside the page */
+function positionModal(modal, box) {
+    var pageHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+    modal.style.height = pageHeight + "px";
+    var boxHeight = box.offsetHeight || 400;
+    var top = Math.max(10, Math.min(lastClickY - 60, pageHeight - boxHeight - 10));
+    box.style.top = top + "px";
+}
+
+
+function renderNameList(names) {
+    if (!names || names.length === 0) return '<div class="modal-empty">No matching records found.</div>';
+    var html = '<div class="modal-count">' + accountsLabel(names.length) + '</div><ul>';
+    names.forEach(function(name) { html += "<li>" + escapeHtml(name) + "</li>"; });
+    return html + "</ul>";
+}
+
+
+function fmtDate(value) {
+    if (!value) return "—";
+    var d = ddParseDate(value);
+    if (!d) return escapeHtml(String(value));
+    var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return ("0" + d.getDate()).slice(-2) + "-" + months[d.getMonth()] + "-" + d.getFullYear();
+}
+
+
+function detailValue(info, deal, account) {
+    if (!info || !info.found) return "—";
+    var record = info.module === "Deals" ? deal : (account && account.raw);
+    var value = record ? record[info.api] : null;
+    if (value === null || value === undefined || value === "") return "—";
+    if (/date/i.test(info.label + " " + info.api)) return fmtDate(fieldValueText(value));
+    return escapeHtml(fieldValueText(value));
+}
+
+
+function latestDeal(deals) {
+    return (deals || []).slice().sort(function(a, b) {
+        return String(b.Modified_Time || b.Created_Time || "").localeCompare(String(a.Modified_Time || a.Created_Time || ""));
+    })[0] || null;
+}
+
+
+function detailTable(columns, rows, summaryHtml) {
+    if (!rows.length) return (summaryHtml || "") + '<div class="modal-empty">No matching records found.</div>';
+    var html = (summaryHtml || "") + '<div class="table-scroll"><table class="detail-table"><thead><tr>';
+    columns.forEach(function(c) { html += '<th class="' + (c.logic ? "logic" : "") + '">' + escapeHtml(c.title) + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rows.forEach(function(r) {
+        html += '<tr>';
+        columns.forEach(function(c) {
+            html += '<td class="' + (c.left ? "left " : "") + (c.logic ? "logic" : "") + '">' + (r[c.key] === undefined ? "—" : r[c.key]) + '</td>';
+        });
+        html += '</tr>';
+    });
+    return html + '</tbody></table></div>';
+}
+
+
+var CARD_LOGIC = {
+    achieved: { dateKey: "actualOrderDate", dateTitle: "Actual Order Date", quarterKey: "actual",
+        rule: "Closed Won stage, Deal Type New, Deal Year " + FY_FILTER + ", Actual Order Date in FY, deal owner selected, test deals left out" },
+    payment_received: { dateKey: "paymentDate", dateTitle: "Payment Date", quarterKey: "payment",
+        rule: "Payment Received / Part Payment Received / Short Payment, Deal Type New, Deal Year " + FY_FILTER + ", Payment Date in FY, deal owner selected, test deals left out" },
+    payment_pending: { dateKey: "closingDate", dateTitle: "Closing Date", quarterKey: "closing",
+        rule: "Email Confirmation / PI Sent - Order Received, Deal Type New, Deal Year " + FY_FILTER + ", Closing Date in FY, deal owner selected" },
+    current_pipeline: { dateKey: "expectedOrderDate", dateTitle: "Expected Order Date", quarterKey: "expected",
+        rule: "Open stage, Deal Type New, Deal Year " + FY_FILTER + ", Expected Order Date in FY, Product isn't Knimbus Default, deal owner = account owner" }
+};
+
+
+async function runCardDetail(scope, category) {
+
+    var live = await loadLiveData();
+    var ownerSet = ownerSetFromNames(scope.names, live).set;
+    var gistSelection = scope.gist || [];
+    var selectedQuarter = currentQuarterSelection();
+
+    // ---- Target ----
+    if (category === "target") {
+        var teamRows = teamRowsInScope(scope.names, gistSelection);
+        var rowsT = teamRows.map(function(item) {
+            var row = item.row;
+            var r = {
+                team: escapeHtml(row.team),
+                matchedBy: escapeHtml((row.owners || []).length ? "Owner: " + row.owners.join(", ") : "Gist Account Owner contains: " + (row.gist || []).join(", ")),
+                fy: formatLakh(teamFyTarget(row)),
+                period: formatLakh(teamTarget(row, selectedQuarter))
+            };
+            QUARTERS.forEach(function(q) { r[q] = formatLakh(teamQuarterTarget(row, q)); });
+            return r;
+        });
+        var colsT = [{ key: "team", title: "Sales Team", left: true }, { key: "matchedBy", title: "Matched by", left: true },
+            { key: "fy", title: "FY Target" }]
+            .concat(QUARTERS.map(function(q) { return { key: q, title: q + " Target" }; }))
+            .concat([{ key: "period", title: "Target for " + (selectedQuarter === ALL_QUARTERS ? "FY" : selectedQuarter), logic: true }]);
+        var sumT = teamRows.reduce(function(s, item) { return s + teamTarget(item.row, selectedQuarter); }, 0);
+        return detailTable(colsT, rowsT, '<div class="modal-summary"><strong>' + teamRows.length + (teamRows.length === 1 ? ' team' : ' teams') + '</strong>, total target <strong>' +
+            formatLakh(sumT) + '</strong>. Targets come from SALES_TEAM_TARGETS in the widget.</div>');
+    }
+
+    // ---- Deal cards ----
+    if (CARD_LOGIC[category]) {
+
+        var logic = CARD_LOGIC[category];
+        var rows = [];
+        var total = 0;
+        var accountSet = {};
+
+        live.deals.forEach(function(deal) {
+
+            var ctx = dealContext(deal, live, selectedQuarter, gistSelection, true);
+            if (!ctx || !matchesCardCategory(ctx, category, ownerSet)) return;
+
+            total += ctx.amount;
+            accountSet[ctx.accId] = true;
+
+            rows.push({
+                sortKey: ctx.accName.toLowerCase(),
+                deal: escapeHtml(deal.Deal_Name || "(No name)"),
+                account: escapeHtml(ctx.accName),
+                owner: escapeHtml(ctx.dealOwnerName || "—"),
+                accountOwner: escapeHtml(ctx.account ? ctx.account.ownerName : "—"),
+                stage: escapeHtml(ctx.stage),
+                logicDate: fmtDate(fieldValueText(deal[fieldInfo[logic.dateKey].api])) + " (" + (ctx.dateQuarters[logic.quarterKey] || "—") + ")",
+                expectedBusiness: formatLakh(ctx.amount),
+                orderReceivedDate: detailValue(fieldInfo.orderReceivedDate, deal, ctx.account),
+                ouCode: detailValue(fieldInfo.ouCode, deal, ctx.account),
+                subStartDate: detailValue(fieldInfo.subStartDate, deal, ctx.account),
+                dealYear: escapeHtml(dealFiscalYear(deal) || "—"),
+                dealType: escapeHtml(fieldValueText(deal[fieldInfo.dealType.api]) || "—"),
+                product: escapeHtml(ctx.products.join(", ") || "—"),
+                plan: escapeHtml(ctx.plan)
+            });
+        });
+
+        rows.sort(function(a, b) { return a.sortKey.localeCompare(b.sortKey); });
+
+        var cols = [
+            { key: "deal", title: "Deal", left: true },
+            { key: "account", title: "Account", left: true },
+            { key: "owner", title: "Owner", left: true }
+        ];
+        if (category === "current_pipeline") cols.push({ key: "accountOwner", title: "Account Owner", left: true, logic: true });
+        cols = cols.concat([
+            { key: "stage", title: "Stage", left: true, logic: true },
+            { key: "logicDate", title: logic.dateTitle + " (Quarter)", logic: true },
+            { key: "expectedBusiness", title: "Expected Business" },
+            { key: "orderReceivedDate", title: "Order Received Date" },
+            { key: "ouCode", title: "OU Code" },
+            { key: "subStartDate", title: "Sub Start Date" },
+            { key: "dealYear", title: "Deal Year", logic: true },
+            { key: "dealType", title: "Deal Type", logic: true },
+            { key: "product", title: "Product", logic: category === "current_pipeline" },
+            { key: "plan", title: "Plan" }
+        ]);
+
+        var summary = '<div class="modal-summary"><strong>' + rows.length + (rows.length === 1 ? ' deal' : ' deals') + '</strong>, ' +
+            accountsLabel(Object.keys(accountSet).length) + ', total <strong>' + formatLakh(total) + '</strong>.<br>Rule: ' +
+            escapeHtml(logic.rule) + (selectedQuarter !== ALL_QUARTERS ? ", " + logic.dateTitle + " in " + selectedQuarter : "") +
+            '. Highlighted columns are the ones the rule checks.' + missingDetailNote() + '</div>';
+
+        return detailTable(cols, rows, summary);
+    }
+
+    // ---- Account cards ----
+    var accounts = filterAccounts(live, ownerSet, gistSelection);
+    var calls = await getCallsForOwners(ownerSet);
+    var latest = latestOwnerCalls(accounts, calls);
+    var now = new Date();
+    var rowsA = [];
+    var ebTotal = 0;
+    var showGist = accounts.some(function(a) { return a.gistNames.length; });
+
+    accounts.forEach(function(account) {
+
+        var lastCall = latest[account.id];
+        if (category === "untouched" && lastCall) return;
+        if (category === "touched" && !lastCall) return;
+
+        var newDeals = live.newDealsByAccount[account.id] || [];
+        var fyNewDeals = newDeals.filter(function(d) { return dealFiscalYear(d) === FY_FILTER; });
+        var eb = fyNewDeals.reduce(function(s, d) { return s + dealAmountLakh(d); }, 0);
+        var ref = latestDeal(fyNewDeals.length ? fyNewDeals : newDeals);
+        ebTotal += eb;
+
+        var status = "Untouched";
+        if (lastCall) {
+            var age = agingOf(lastCall);
+            status = age === "last_30" ? "Touched, last 30 days" : (age === "days_31_60" ? "Touched, 31-60 days" : "Touched, 60+ days");
+        }
+
+        rowsA.push({
+            sortKey: account.name.toLowerCase(),
+            account: escapeHtml(account.name),
+            owner: escapeHtml(account.ownerName),
+            gist: escapeHtml(account.gistNames.join(", ") || "—"),
+            bucket: escapeHtml(account.bucket),
+            newDeals: String(newDeals.length),
+            lastCall: lastCall ? fmtDate(lastCall.toISOString().slice(0, 10)) : "—",
+            daysSince: lastCall ? String(Math.floor((now - lastCall) / 86400000)) : "—",
+            status: status,
+            expectedBusiness: formatLakh(eb),
+            orderReceivedDate: detailValue(fieldInfo.orderReceivedDate, ref, account),
+            ouCode: detailValue(fieldInfo.ouCode, ref, account),
+            subStartDate: detailValue(fieldInfo.subStartDate, ref, account)
+        });
+    });
+
+    rowsA.sort(function(a, b) { return a.sortKey.localeCompare(b.sortKey); });
+
+    var colsA = [
+        { key: "account", title: "Account", left: true },
+        { key: "owner", title: "Owner", left: true, logic: true }
+    ];
+    if (showGist) colsA.push({ key: "gist", title: "Gist Account Owner", left: true });
+    colsA = colsA.concat([
+        { key: "newDeals", title: "Deal Type New Deals", logic: true },
+        { key: "lastCall", title: "Last Call by Owner", logic: category !== "total_accounts" },
+        { key: "daysSince", title: "Days Since Call" },
+        { key: "status", title: "Status", left: true, logic: category !== "total_accounts" },
+        { key: "bucket", title: "Bucket", left: true },
+        { key: "expectedBusiness", title: "Expected Business (" + FY_SHORT_LABEL + ")" },
+        { key: "orderReceivedDate", title: "Order Received Date" },
+        { key: "ouCode", title: "OU Code" },
+        { key: "subStartDate", title: "Sub Start Date" }
+    ]);
+
+    var ruleA = {
+        total_accounts: "accounts of the selected owner with at least one Deal Type New deal",
+        untouched: "those accounts with no call logged by the account owner",
+        touched: "those accounts with at least one call logged by the account owner"
+    }[category];
+
+    var summaryA = '<div class="modal-summary"><strong>' + accountsLabel(rowsA.length) + '</strong>, Expected Business <strong>' +
+        formatLakh(ebTotal) + '</strong>.<br>Rule: ' + escapeHtml(ruleA) + '. Expected Business is the sum of the account\'s Deal Type New ' +
+        'deals with Deal Year ' + FY_FILTER + '; Order Received Date, OU Code and Sub Start Date come from the account, or from its latest ' +
+        'Deal Type New deal when the field is on Deals.' + missingDetailNote() + '</div>';
+
+    return detailTable(colsA, rowsA, summaryA);
+}
+
+
+function missingDetailNote() {
+    var missing = [["orderReceivedDate", "Order Received Date"], ["ouCode", "OU Code"], ["subStartDate", "Sub Start Date"]]
+        .filter(function(pair) { return !fieldInfo[pair[0]].found; })
+        .map(function(pair) { return pair[1]; });
+    return missing.length ? '<br><span style="color:#b45309;">Not found in CRM: ' + missing.join(", ") +
+        '. Set its API name in DETAIL_FIELDS at the top of the widget.</span>' : "";
 }
 
 
