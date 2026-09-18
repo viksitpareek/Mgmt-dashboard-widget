@@ -323,7 +323,7 @@ var SALES_TEAM_TARGETS = [
     { team: "Sharansh Gond",          gist: ["Sharansh"],                  fy: 25, q: [4, 7, 7, 7],         monthTarget: 2.3 },
     { team: "Anurag",                 owners: ["Anurag Mishra"],           fy: 45, q: [2, 10.5, 13, 19.5],  monthTarget: 2.5 },
     { team: "Tejal",                  owners: ["Tejal Pandya"],            fy: 30, q: [2.5, 7, 9, 11.5],    monthTarget: 1.75 },
-    { team: "Ashish",                 owners: ["Ashish Kumar"],            fy: 25, q: [2.5, 4.5, 6.5, 10.5], monthTarget: 1.5 }
+    { team: "Ashish",                 owners: ["Ashish Kumar"],            fy: 25, q: [2.5, 4.5, 7.5, 10.5], monthTarget: 1.5 }
 ];
 
 var PLAN_COLORS = { "Plan A": "#d64550", "Plan B": "#f0b429", "Plan C": "#e8919c", "No Plan": "#9ca3af" };
@@ -2020,6 +2020,15 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
     var showOthers = othersInScope(ownerNames);
     var others = showOthers ? computeOthers(live, ownerNames, gistSelection) : null;
 
+    // Accounts behind each team: same population as the Total Accounts card
+    var ownerSet = ownerSetFromNames(ownerNames, live).set;
+    var teamAccounts = SALES_TEAM_TARGETS.map(function() { return 0; });
+    var otherAccounts = 0;
+    filterAccounts(live, ownerSet, gistSelection).forEach(function(a) {
+        if (a.teamIndex >= 0) teamAccounts[a.teamIndex]++;
+        else otherAccounts++;
+    });
+
     if (rows.length === 0 && !showOthers) {
         wrap.innerHTML = '<div class="loading">No sales team target is set for this selection. ' +
             'Add it to SALES_TEAM_TARGETS at the top of the widget.</div>';
@@ -2056,7 +2065,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
         var idx = item.index;
 
         html += '<tr><td class="row-label">' + escapeHtml(row.team) +
-            '<span class="sub">' + accountsLabel(live.teamAccountCounts[idx] || 0) + '</span></td>';
+            '<span class="sub">' + accountsLabel(teamAccounts[idx] || 0) + '</span></td>';
         html += '<td>' + formatLakh(teamFyTarget(row)) + '</td>';
 
         if (single) {
@@ -2091,8 +2100,8 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
 
     if (showOthers) {
         var whoList = Object.keys(others.who).sort();
-        html += '<tr><td class="row-label">Others<span class="sub">' +
-            escapeHtml(whoList.length ? whoList.slice(0, 4).join("; ") + (whoList.length > 4 ? " and " + (whoList.length - 4) + " more" : "") : "No achievement") +
+        html += '<tr><td class="row-label">Others<span class="sub">' + accountsLabel(otherAccounts) + ' &middot; ' +
+            escapeHtml(whoList.length ? whoList.slice(0, 4).join("; ") + (whoList.length > 4 ? " and " + (whoList.length - 4) + " more" : "") : "no achievement") +
             '</span></td>';
         html += '<td>' + formatLakh(0) + '</td>';
         if (single) {
@@ -2135,8 +2144,21 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
 
     html += '<div class="data-source">Achieved uses the Achieved card rules: deal owner, Closed Won stages, Deal Type New, ' +
         'Deal Year ' + FY_FILTER + ' and Actual Order Date in ' + FY_LONG_LABEL + ' (the quarter comes from the Actual Order Date). ' +
-        GIST_HQ_OWNER_NAME +
-        ' deals are split into teams by the account\'s Gist Account Owner.</div>';
+        GIST_HQ_OWNER_NAME + ' deals are split into teams by the account\'s Gist Account Owner. The account count under each ' +
+        'team uses the same accounts as the Total Accounts card, so the teams plus Others add up to it.</div>';
+
+    var mismatched = rows.filter(function(item) {
+        var sum = QUARTERS.reduce(function(t, q) { return t + teamQuarterTarget(item.row, q); }, 0);
+        return Math.abs(sum - teamFyTarget(item.row)) > 0.005;
+    }).map(function(item) {
+        var sum = QUARTERS.reduce(function(t, q) { return t + teamQuarterTarget(item.row, q); }, 0);
+        return item.row.team + " (FY " + formatLakh(teamFyTarget(item.row)) + ", quarters " + formatLakh(sum) + ")";
+    });
+
+    if (mismatched.length) {
+        html += '<div class="warn-note">FY target does not equal the four quarter targets for: ' +
+            mismatched.map(escapeHtml).join(", ") + '. Fix the numbers in SALES_TEAM_TARGETS.</div>';
+    }
 
     var unmatched = live.gistValues.filter(function(name) {
         if (name === GIST_NOT_ASSIGNED) return false;
@@ -2149,7 +2171,7 @@ function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter
     }
 
     var emptyTeams = rows.filter(function(item) {
-        return teamFyTarget(item.row) > 0 && !live.teamAccountCounts[item.index];
+        return teamFyTarget(item.row) > 0 && !teamAccounts[item.index];
     }).map(function(item) { return item.row.team; });
 
     if (emptyTeams.length) {
@@ -2221,7 +2243,7 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
     var html = '<div class="eb-summary">';
 
 
-    html += '<div class="eb-tile" style="border-left-color:#d97706;"><span class="label">Current Pipeline</span>' +
+    html += '<div class="eb-tile" style="border-left-color:#d97706;"><span class="label">Pipeline (by account owner)</span>' +
         '<span class="value">' + formatLakh(grandPipeline.amount_lakh) + '</span>' +
         '<span class="sub">' + accountsLabel(pipelineAccountCount) + '</span></div>';
 
@@ -2240,7 +2262,7 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
     m.plans.forEach(function(plan, i) {
         html += '<th><span class="plan-dot" style="background:' + planColor(plan, i) + ';"></span>' + escapeHtml(plan) + '</th>';
     });
-    html += '<th>Current Pipeline</th><th class="mix-col">Plan Mix</th></tr></thead><tbody>';
+    html += '<th>Pipeline (by account owner)</th><th class="mix-col">Plan Mix</th></tr></thead><tbody>';
 
     m.quarters.forEach(function(quarter) {
 
@@ -2281,6 +2303,8 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
     }
 
     html += '</tbody></table></div>';
+    html += '<div class="data-source">Pipeline here counts open deals on accounts owned by the selected owner, whoever logged the ' +
+        'deal. The Current Pipeline card at the top is stricter: the deal owner must also own the account, so the two can differ.</div>';
     html += notes;
 
     wrap.innerHTML = html;
@@ -2413,6 +2437,8 @@ function renderStageFunnel(m) {
 
     html += '</div><div class="funnel-total">All stages: <strong>' + formatLakh(totalAmount) + '</strong> across ' +
         totalCount + ' deals</div>';
+    html += '<div class="data-source">Counts DEALS (the Account Owner Summary counts accounts) and leaves out Knimbus Default ' +
+        'and the Renewal Notice stages, so Closed Won and Closed Lost here are smaller than in that table.</div>';
 
     var others = Object.keys(m.groupTotals).filter(function(g) { return groups.indexOf(g) === -1; }).sort();
     if (others.length) {
@@ -2516,7 +2542,8 @@ function renderAccountOwnerSummary() {
 
     var html = '<div class="table-scroll"><table><thead><tr>';
     html += '<th style="text-align:left;">Account Owner</th><th>Total</th><th>Last 30</th>';
-    html += '<th>31-60</th><th>60+</th><th>Touched</th><th>Non-Touched</th><th>Closed Won</th><th>Closed Lost</th>';
+    html += '<th>31-60</th><th>60+</th><th>Touched</th><th>Non-Touched</th><th>Closed Won<br><span style="font-weight:400;font-size:11px;">accounts</span></th>' +
+        '<th>Closed Lost<br><span style="font-weight:400;font-size:11px;">accounts</span></th>';
     html += '</tr></thead><tbody>';
 
     var grand = {};
@@ -2568,9 +2595,9 @@ function renderAccountOwnerSummary() {
     }
 
     html += '</tbody></table></div>';
-    html += '<div class="data-source">Accounts with at least one Deal Type New deal. ' +
-        'Closed Won and Closed Lost count those accounts with a deal in that stage group, Deal Year ' + FY_FILTER +
-        ', Expected Order Date in the selected period.</div>';
+    html += '<div class="data-source">Accounts with at least one Deal Type New deal. Closed Won and Closed Lost count ACCOUNTS ' +
+        'with a deal in that stage group (Deal Year ' + FY_FILTER + ', Actual Order Date / Closing Date in the selected period), ' +
+        'including Knimbus Default. The Stage-wise funnel counts DEALS and leaves Knimbus Default out, so its numbers are smaller.</div>';
 
     container.innerHTML = html;
 
@@ -2691,7 +2718,7 @@ function categoryLabel(category) {
 
     if (parts[0] === "bucket") return decodeURIComponent(parts[1]) + " - " + parts[2].replace(/_/g, " ");
     if (parts[0] === "qp") return decodeURIComponent(parts[1]) + " " + decodeURIComponent(parts[2]) + " Expected Business";
-    if (parts[0] === "quarter_pipeline") return decodeURIComponent(parts[1]) + " Current Pipeline";
+    if (parts[0] === "quarter_pipeline") return decodeURIComponent(parts[1]) + " Pipeline (by account owner)";
     if (parts[0] === "stage") return decodeURIComponent(parts[1]);
     if (parts[0] === "team") {
         var row = parts[1] === "others" ? { team: "Others" } : (SALES_TEAM_TARGETS[Number(parts[1])] || { team: "Team" });
