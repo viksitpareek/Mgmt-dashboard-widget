@@ -280,9 +280,10 @@ var EXCLUDE_LOST_FROM_EXPECTED = true;    // Closed Lost isn't counted as expect
 
 /* The dashboard only covers these account owners ("All Owners" = all of them) */
 /* ---- Focused accounts ----
- * Focused accounts = unique accounts of two sets. Both need a Deal Type New deal with Deal Year FY_FILTER:
- *   Set A: the account's Bucket Type starts with 1, 2 or 3 (not 4, not blank) - Knimbus Default deals still count
- *   Set B: one of those deals has an Expected Order Date inside the FY and a Product that isn't Knimbus Default
+ * Focused accounts = unique accounts of two sets:
+ *   Set A: every account whose Bucket Type starts with 1, 2 or 3 (not 4, not blank)
+ *   Set B: accounts with a Deal Type New deal of Deal Year FY_FILTER whose Expected Order Date is
+ *          inside the FY and whose Product isn't Knimbus Default
  * Pipeline - Focused leaves Knimbus Default out.
  */
 var FOCUSED_BUCKET_PREFIXES = ["1", "2", "3"];
@@ -1054,19 +1055,20 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts, demoResult) {
         //   Set A: Bucket Type 1 / 2 / 3 (Knimbus Default deals still count)
         //   Set B: Expected Order Date inside the FY on a deal whose Product isn't Knimbus Default
         var fyNew = (newDealsByAccount[id] || []).filter(function(d) { return dealFiscalYear(d) === FY_FILTER; });
-        var bucketFocused = fyNew.length > 0 && isFocusedBucket(accountsById[id].bucket);
+        // Set A is the bucket alone - every account in bucket 1/2/3 is focused
+        var bucketFocused = isFocusedBucket(accountsById[id].bucket);
         var datedThisFy = fyNew.some(function(d) {
             return !!fyQuarterOf(d[fieldInfo.expectedOrderDate.api]) && !dealHasExcludedProduct(d);
         });
         accountsById[id].setA = bucketFocused;
         accountsById[id].setB = datedThisFy;
-        accountsById[id].focused = fyNew.length > 0 &&
-            (FOCUSED_MODE === "intersection" ? (bucketFocused && datedThisFy) : (bucketFocused || datedThisFy));
-        accountsById[id].focusReason = fyNew.length === 0 ? "No Deal Type New deal in " + FY_FILTER
-            : (bucketFocused && datedThisFy ? "Bucket " + accountsById[id].bucket + " and Expected Order Date in FY"
-               : bucketFocused ? "Bucket " + accountsById[id].bucket
-               : datedThisFy ? "Expected Order Date in FY (not " + EXCLUDED_PRODUCTS.join(" / ") + ")"
-               : "Bucket " + accountsById[id].bucket + ", no dated non-" + EXCLUDED_PRODUCTS.join(" / ") + " deal");
+        accountsById[id].focused = FOCUSED_MODE === "intersection"
+            ? (bucketFocused && datedThisFy) : (bucketFocused || datedThisFy);
+        accountsById[id].focusReason = bucketFocused && datedThisFy
+            ? "Bucket " + accountsById[id].bucket + " and Expected Order Date in FY"
+            : bucketFocused ? "Bucket " + accountsById[id].bucket
+            : datedThisFy ? "Expected Order Date in FY (not " + EXCLUDED_PRODUCTS.join(" / ") + ")"
+            : "Bucket " + accountsById[id].bucket + ", no dated non-" + EXCLUDED_PRODUCTS.join(" / ") + " deal in " + FY_FILTER;
     });
 
     var demoInfo = buildDemoIndex(demoResult, accountsById);
@@ -1903,7 +1905,7 @@ function renderAll() {
 
     html += '<div class="card-row focus">';
     html += cardHtml("Focused Accounts", "Calculating...", "waiting", "focused",
-        "Bucket " + FOCUSED_BUCKET_PREFIXES.join("/") + ", or Expected Order Date in FY (excl. " + EXCLUDED_PRODUCTS.join(", ") + ")");
+        "All Bucket " + FOCUSED_BUCKET_PREFIXES.join("/") + ", plus Expected Order Date in FY (excl. " + EXCLUDED_PRODUCTS.join(", ") + ")");
     html += cardHtml("Touched - Last " + TOUCHED_WINDOW_DAYS + " Days", "Calculating...", "achieved waiting", "focused_touched");
     html += cardHtml("Demo Done", "Calculating...", "achieved waiting", "focused_demo");
     html += cardHtml("Pipeline - Focused", "Calculating...", "pending waiting", "current_pipeline");
@@ -3255,10 +3257,10 @@ async function runCardDetail(scope, category) {
     ]);
 
     var ruleA = {
-        focused: (FOCUSED_MODE === "intersection" ? "accounts in BOTH sets" : "unique accounts of two sets") +
-            ", both needing a Deal Type New deal of " + FY_FILTER + ": " +
-            "(A) Bucket " + FOCUSED_BUCKET_PREFIXES.join("/") + ", not 4 or blank, whatever the Product; " +
-            "(B) a deal with an Expected Order Date inside " + FY_LONG_LABEL + " whose Product isn't " + EXCLUDED_PRODUCTS.join(" / "),
+        focused: (FOCUSED_MODE === "intersection" ? "accounts in BOTH sets" : "unique accounts of two sets") + ": " +
+            "(A) every account in Bucket " + FOCUSED_BUCKET_PREFIXES.join("/") + " (not 4, not blank), whatever its deals; " +
+            "(B) accounts with a Deal Type New deal of " + FY_FILTER + " whose Expected Order Date is inside " +
+            FY_LONG_LABEL + " and whose Product isn't " + EXCLUDED_PRODUCTS.join(" / "),
         focused_touched: "focused accounts with a call by the owner (on the account or its deals) in the last " + TOUCHED_WINDOW_DAYS + " days",
         focused_untouched: "focused accounts with no call by the owner in the last " + TOUCHED_WINDOW_DAYS + " days",
         focused_demo: "focused accounts with a record in the Demo module dated inside the selected period",
