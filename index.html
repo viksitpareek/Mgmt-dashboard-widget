@@ -229,7 +229,7 @@
    ========================================================= */
 
 /* Financial year: 1 April FY_START_YEAR to 31 March FY_START_YEAR + 1 */
-var WIDGET_VERSION = "v7 - 24 Sep 2026 - Set A = bucket only";
+var WIDGET_VERSION = "v8 - 24 Sep 2026 - bucket match fixed";
 
 var FY_START_YEAR = 2026;
 var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2) value
@@ -288,6 +288,7 @@ var EXCLUDE_LOST_FROM_EXPECTED = true;    // Closed Lost isn't counted as expect
  *          inside the FY and whose Product isn't Knimbus Default
  * Pipeline - Focused leaves Knimbus Default out.
  */
+/* Bucket Type numbers that count as focused; the value may read "2" or "Bucket 2" */
 var FOCUSED_BUCKET_PREFIXES = ["1", "2", "3"];
 
 /* "union" = Set A OR Set B (unique accounts of both). "intersection" = Set A AND Set B */
@@ -1104,9 +1105,10 @@ function dealHasExcludedProduct(deal) {
 }
 
 
+/* Matches "1", "Bucket 1", "1 - Hot", "B1" - the first number in the value decides */
 function isFocusedBucket(bucket) {
-    var value = String(bucket || "").trim();
-    return FOCUSED_BUCKET_PREFIXES.some(function(p) { return value.indexOf(String(p)) === 0; });
+    var found = String(bucket || "").match(/\d+/);
+    return !!found && FOCUSED_BUCKET_PREFIXES.indexOf(found[0]) !== -1;
 }
 
 
