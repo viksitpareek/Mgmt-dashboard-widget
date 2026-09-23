@@ -286,6 +286,9 @@ var EXCLUDE_LOST_FROM_EXPECTED = true;    // Closed Lost isn't counted as expect
  * Pipeline - Focused leaves Knimbus Default out.
  */
 var FOCUSED_BUCKET_PREFIXES = ["1", "2", "3"];
+
+/* "union" = Set A OR Set B (unique accounts of both). "intersection" = Set A AND Set B */
+var FOCUSED_MODE = "union";
 var TOUCHED_WINDOW_DAYS = 45;
 
 /* Demo module (Zoho custom module). "" = auto-detect; fields are auto-detected from the records */
@@ -1055,7 +1058,10 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts, demoResult) {
         var datedThisFy = fyNew.some(function(d) {
             return !!fyQuarterOf(d[fieldInfo.expectedOrderDate.api]) && !dealHasExcludedProduct(d);
         });
-        accountsById[id].focused = fyNew.length > 0 && (bucketFocused || datedThisFy);
+        accountsById[id].setA = bucketFocused;
+        accountsById[id].setB = datedThisFy;
+        accountsById[id].focused = fyNew.length > 0 &&
+            (FOCUSED_MODE === "intersection" ? (bucketFocused && datedThisFy) : (bucketFocused || datedThisFy));
         accountsById[id].focusReason = fyNew.length === 0 ? "No Deal Type New deal in " + FY_FILTER
             : (bucketFocused && datedThisFy ? "Bucket " + accountsById[id].bucket + " and Expected Order Date in FY"
                : bucketFocused ? "Bucket " + accountsById[id].bucket
@@ -1768,11 +1774,15 @@ function computeFocusedStats(live, accounts, calls, dealStatus, selectedQuarter)
     var cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - TOUCHED_WINDOW_DAYS);
 
-    var stats = { allAccounts: accounts.length, focused: 0, touched: 0, untouched: 0, demo: 0, won: 0, lost: 0 };
+    var stats = { allAccounts: accounts.length, focused: 0, touched: 0, untouched: 0, demo: 0, won: 0, lost: 0,
+                  setAOnly: 0, setBOnly: 0, bothSets: 0 };
 
     accounts.forEach(function(a) {
         if (!a.focused) return;
         stats.focused++;
+        if (a.setA && a.setB) stats.bothSets++;
+        else if (a.setA) stats.setAOnly++;
+        else if (a.setB) stats.setBOnly++;
         var lastCall = latest[a.id];
         if (lastCall && lastCall >= cutoff) stats.touched++;
         else stats.untouched++;
@@ -1968,7 +1978,8 @@ function renderAll() {
             var focus = computeFocusedStats(live, accounts, calls, dealStatus, selectedQuarter);
 
             setCardValue("focused", focus.focused);
-            setCardSub("focused", accountShareSub(focus.focused, focus.allAccounts) + " of this owner");
+            setCardSub("focused", accountShareSub(focus.focused, focus.allAccounts) + " of this owner" +
+                '<br>Bucket only ' + focus.setAOnly + ', date only ' + focus.setBOnly + ', both ' + focus.bothSets);
             setCardValue("focused_touched", focus.touched);
             setCardSub("focused_touched", accountShareSub(focus.touched, focus.focused));
             setCardValue("focused_demo", focus.demo);
@@ -3198,6 +3209,7 @@ async function runCardDetail(scope, category) {
             sortKey: account.name.toLowerCase(),
             account: escapeHtml(account.name),
             focused: account.focused ? "Yes" : "No",
+            focusSet: account.setA && account.setB ? "A + B" : account.setA ? "A (bucket)" : account.setB ? "B (date)" : "—",
             focusReason: escapeHtml(account.focusReason || ""),
             demoDate: demoEntry && demoEntry.last ? fmtDate(demoEntry.last.toISOString().slice(0, 10)) : "—",
             owner: escapeHtml(account.ownerName),
@@ -3223,6 +3235,7 @@ async function runCardDetail(scope, category) {
         { key: "owner", title: "Owner", left: true, logic: !isFocusCard }
     ];
     if (isFocusCard) {
+        colsA.push({ key: "focusSet", title: "Set", logic: true });
         colsA.push({ key: "focusReason", title: "Why focused", left: true, logic: true });
         colsA.push({ key: "demoDate", title: "Last Demo", logic: category === "focused_demo" });
     }
@@ -3242,7 +3255,8 @@ async function runCardDetail(scope, category) {
     ]);
 
     var ruleA = {
-        focused: "unique accounts of two sets, both needing a Deal Type New deal of " + FY_FILTER + ": " +
+        focused: (FOCUSED_MODE === "intersection" ? "accounts in BOTH sets" : "unique accounts of two sets") +
+            ", both needing a Deal Type New deal of " + FY_FILTER + ": " +
             "(A) Bucket " + FOCUSED_BUCKET_PREFIXES.join("/") + ", not 4 or blank, whatever the Product; " +
             "(B) a deal with an Expected Order Date inside " + FY_LONG_LABEL + " whose Product isn't " + EXCLUDED_PRODUCTS.join(" / "),
         focused_touched: "focused accounts with a call by the owner (on the account or its deals) in the last " + TOUCHED_WINDOW_DAYS + " days",
