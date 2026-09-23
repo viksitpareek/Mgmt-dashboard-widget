@@ -229,6 +229,8 @@
    ========================================================= */
 
 /* Financial year: 1 April FY_START_YEAR to 31 March FY_START_YEAR + 1 */
+var WIDGET_VERSION = "v7 - 24 Sep 2026 - Set A = bucket only";
+
 var FY_START_YEAR = 2026;
 var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2) value
 
@@ -654,7 +656,7 @@ function loadReport() {
             var now = new Date();
             document.getElementById("lastUpdated").innerText = "Last Updated: " +
                 now.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) + " " +
-                now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+                now.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) + "  |  " + WIDGET_VERSION;
         })
         .catch(function() {})
         .finally(function() {
