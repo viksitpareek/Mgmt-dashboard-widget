@@ -229,7 +229,7 @@
    ========================================================= */
 
 /* Financial year: 1 April FY_START_YEAR to 31 March FY_START_YEAR + 1 */
-var WIDGET_VERSION = "v9 - USD accounts converted, Quarter x Plan = open deals";
+var WIDGET_VERSION = "v10 - Overall and Others views, USD x 95";
 
 var FY_START_YEAR = 2026;
 var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2) value
@@ -276,7 +276,7 @@ var AMOUNT_UNIT = "auto";      // "rupees", "lakh" or "auto"
 
 /* International accounts (Accounts > Billing Region) hold their deal amounts in USD */
 var INTERNATIONAL_REGION_VALUES = ["international"];
-var USD_TO_INR = 88;           // update when the rate changes
+var USD_TO_INR = 95;           // update when the rate changes
 var ACCOUNT_REGION_FIELD = "";  // "" = auto-detect the "Billing Region" field
 
 /* Closed Won and Closed Lost deals are left out of Quarter x Plan expected business */
@@ -354,8 +354,16 @@ var SALES_TEAM_TARGETS = [
     { team: "Sharansh Gond",          gist: ["Sharansh"],                  fy: 25, q: [4, 7, 7, 7],         monthTarget: 2.3 },
     { team: "Anurag",                 owners: ["Anurag Mishra"],           fy: 45, q: [2, 10.5, 13, 19.5],  monthTarget: 2.5 },
     { team: "Tejal",                  owners: ["Tejal Pandya"],            fy: 30, q: [2.5, 7, 9, 11.5],    monthTarget: 1.75 },
-    { team: "Ashish",                 owners: ["Ashish Kumar"],            fy: 25, q: [2.5, 4.5, 7.5, 10.5], monthTarget: 1.5 }
+    { team: "Ashish",                 owners: ["Ashish Kumar"],            fy: 25, q: [2.5, 4.5, 7.5, 10.5], monthTarget: 1.5 },
+
+    /* New business target for international accounts (Billing Region = International).
+       Only counted in the "Overall" view. Quarters are a proportional split of 160 - set your own. */
+    { team: "International",          international: true,                 fy: 160, q: [9.6, 32, 51.2, 67.2], monthTarget: 0 }
 ];
+
+/* The two extra entries in the owner filter */
+var OVERALL_LABEL = "Overall (everything)";
+var OTHERS_LABEL = "Others (outside the owner list)";
 
 var PLAN_COLORS = { "Plan A": "#d64550", "Plan B": "#f0b429", "Plan C": "#e8919c", "No Plan": "#9ca3af" };
 var EXTRA_PLAN_COLORS = ["#0ea5e9", "#8b5cf6", "#10b981", "#f97316", "#6b7280"];
@@ -437,11 +445,14 @@ function populateQuarterFilter() {
 function populateOwnerFilter() {
 
     var select = document.getElementById("ownerFilter");
-    var html = '<option value="All Owners">All Owners</option>';
+    var html = '<option value="' + OVERALL_LABEL + '">' + OVERALL_LABEL + '</option>' +
+        '<option value="All Owners">All Owners (the ' + ALLOWED_ACCOUNT_OWNERS.length + ' below)</option>';
 
     ALLOWED_ACCOUNT_OWNERS.forEach(function(name) {
         html += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
     });
+
+    html += '<option value="' + OTHERS_LABEL + '">' + OTHERS_LABEL + '</option>';
 
     select.innerHTML = html;
     select.value = selectedOwnerName;
@@ -456,8 +467,23 @@ function onOwnerChange() {
 }
 
 
+/* "list" = named owners, "all" = every owner in CRM, "others" = everyone outside the owner list */
+function ownerScopeMode() {
+    if (selectedOwnerName === OVERALL_LABEL) return "all";
+    if (selectedOwnerName === OTHERS_LABEL) return "others";
+    return "list";
+}
+
+
 function effectiveOwnerNames() {
+    if (ownerScopeMode() !== "list") return [];        // resolved from CRM once the data is loaded
     return selectedOwnerName === "All Owners" ? ALLOWED_ACCOUNT_OWNERS.slice() : [selectedOwnerName];
+}
+
+
+function isAllowedOwnerName(name) {
+    var lower = String(name || "").trim().toLowerCase();
+    return ALLOWED_ACCOUNT_OWNERS.some(function(n) { return n.trim().toLowerCase() === lower; });
 }
 
 
@@ -610,21 +636,35 @@ function teamMatchesAccount(row, account) {
 
 function assignTeam(account) {
     for (var i = 0; i < SALES_TEAM_TARGETS.length; i++) {
+        if (SALES_TEAM_TARGETS[i].international) continue;
         if (teamMatchesAccount(SALES_TEAM_TARGETS[i], account)) return i;
+    }
+    // an international account with no team of its own belongs to the International row
+    if (account.isInternational) {
+        for (var j = 0; j < SALES_TEAM_TARGETS.length; j++) {
+            if (SALES_TEAM_TARGETS[j].international) return j;
+        }
     }
     return -1;
 }
 
 
 /* Which target rows belong to the selected owners / Gist filter */
-function teamRowsInScope(ownerNames, gistSelection) {
+function teamRowsInScope(ownerNames, gistSelection, mode) {
 
     var names = (ownerNames || []).map(function(n) { return n.trim().toLowerCase(); });
     var includesGist = (ownerNames || []).some(isGistHqName);
 
+    if (mode === "others") return [];                      // Others has no target
+    if (mode === "all") {
+        return SALES_TEAM_TARGETS.map(function(row, index) { return { row: row, index: index }; });
+    }
+
     return SALES_TEAM_TARGETS.map(function(row, index) { return { row: row, index: index }; }).filter(function(item) {
 
         var row = item.row;
+
+        if (row.international) return false;                // only shown in Overall
 
         if ((row.owners || []).some(function(o) { return names.indexOf(o.trim().toLowerCase()) !== -1; })) return true;
 
@@ -1010,6 +1050,12 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts, demoResult) {
 
     var accountsById = {};
     var ownerIdByName = {};
+    var allOwners = {};                 // every owner id seen on an account or a deal -> name
+
+    deals.forEach(function(d) {
+        var id = ddLookupId(d.Owner);
+        if (id) allOwners[id] = ddLookupName(d.Owner, "Unassigned");
+    });
     var gistSet = {};
     var gistHasEmpty = false;
     var teamAccountCounts = SALES_TEAM_TARGETS.map(function() { return 0; });
@@ -1042,7 +1088,10 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts, demoResult) {
 
         accountsById[account.id] = account;
 
-        if (ownerId) ownerIdByName[ownerName.trim().toLowerCase()] = ownerId;
+        if (ownerId) {
+            ownerIdByName[ownerName.trim().toLowerCase()] = ownerId;
+            allOwners[ownerId] = ownerName;
+        }
 
         if (isGistHqName(ownerName)) {
             if (gistNames.length === 0) gistHasEmpty = true;
@@ -1083,9 +1132,10 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts, demoResult) {
         });
         accountsById[id].setA = bucketFocused;
         accountsById[id].setB = datedThisFy;
-        accountsById[id].focused = FOCUSED_MODE === "intersection"
-            ? (bucketFocused && datedThisFy) : (bucketFocused || datedThisFy);
-        accountsById[id].focusReason = bucketFocused && datedThisFy
+        accountsById[id].focused = !accountsById[id].isInternational && (FOCUSED_MODE === "intersection"
+            ? (bucketFocused && datedThisFy) : (bucketFocused || datedThisFy));
+        accountsById[id].focusReason = accountsById[id].isInternational ? "International account - not a focused account"
+            : bucketFocused && datedThisFy
             ? "Bucket " + accountsById[id].bucket + " and Expected Order Date in FY"
             : bucketFocused ? "Bucket " + accountsById[id].bucket
             : datedThisFy ? "Expected Order Date in FY (not " + EXCLUDED_PRODUCTS.join(" / ") + ")"
@@ -1108,6 +1158,7 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts, demoResult) {
         dealAccount: dealAccount,
         accountsById: accountsById,
         ownerIdByName: ownerIdByName,
+        allOwners: allOwners,
         gistValues: gistValues,
         gistHqAccountCount: gistHqAccounts.length,
         teamAccountCounts: teamAccountCounts,
@@ -1418,6 +1469,32 @@ function isPipelineDeal(ctx, applyProductRule) {
 }
 
 
+/* Resolve a scope ("list" / "all" / "others") into owner ids and the owner names behind them */
+function resolveOwnerScope(scope, live) {
+
+    var mode = scope.mode || "list";
+
+    if (mode === "list") {
+        var listed = ownerSetFromNames(scope.names || [], live);
+        return {
+            mode: mode, set: listed.set, missing: listed.missing,
+            names: (scope.names || []).filter(function(n) { return listed.missing.indexOf(n) === -1; })
+        };
+    }
+
+    var set = {}, names = [];
+    Object.keys(live.allOwners).forEach(function(id) {
+        var name = live.allOwners[id];
+        if (mode === "others" && isAllowedOwnerName(name)) return;
+        set[id] = true;
+        if (names.indexOf(name) === -1) names.push(name);
+    });
+    names.sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
+
+    return { mode: mode, set: set, missing: [], names: names };
+}
+
+
 /* ownerSet = { userId: true } for the selected owners */
 function ownerSetFromNames(names, live) {
     var set = {};
@@ -1623,6 +1700,13 @@ function teamIndexForDeal(ctx) {
         }
     }
 
+    // an international account with no team of its own belongs to the International row
+    if (ctx.account && ctx.account.isInternational) {
+        for (var k = 0; k < SALES_TEAM_TARGETS.length; k++) {
+            if (SALES_TEAM_TARGETS[k].international) return k;
+        }
+    }
+
     return -1;
 }
 
@@ -1736,6 +1820,7 @@ function getOwnerCalls(ownerId) {
 
 function getCallsForOwners(ownerSet) {
     var ids = Object.keys(ownerSet);
+    if (ids.length > 6) return getAllCalls();      // Overall / Others: one fetch instead of dozens
     return Promise.all(ids.map(getOwnerCalls)).then(function(lists) {
         var out = [];
         lists.forEach(function(l) { out = out.concat(l); });
@@ -1879,9 +1964,9 @@ function computeAccountStats(accounts, calls, dealStatus) {
    TARGETS FOR THE CURRENT FILTERS
    ========================================================= */
 
-function targetsForFilters(ownerNames, gistSelection) {
+function targetsForFilters(ownerNames, gistSelection, mode) {
 
-    var rows = teamRowsInScope(ownerNames, gistSelection);
+    var rows = teamRowsInScope(ownerNames, gistSelection, mode);
     var result = { rows: rows.length, fy: 0, Q1: 0, Q2: 0, Q3: 0, Q4: 0 };
 
     rows.forEach(function(item) {
@@ -1905,21 +1990,25 @@ function targetValue(targets, selectedQuarter) {
 function renderAll() {
 
     var ownerNames = effectiveOwnerNames();
+    var mode = ownerScopeMode();
     var selectedQuarter = currentQuarterSelection();
 
     populateGistOwnerFilter();
 
     var gistSelection = currentGistSelection();
     var period = periodLabel(selectedQuarter);
-    var targets = targetsForFilters(ownerNames, gistSelection);
+    var targets = targetsForFilters(ownerNames, gistSelection, mode);
     var target = targetValue(targets, selectedQuarter);
     var allQuarters = selectedQuarter === ALL_QUARTERS;
 
     aorLive = null;
     updateSummaryTitle(selectedQuarter, gistSelection);
 
-    var targetSub = !targets.rows ? "No target set"
-        : (allQuarters ? targets.rows + (targets.rows === 1 ? " team" : " teams") : "FY target " + formatLakh(targets.fy));
+    var targetSub = mode === "others" ? "Others has no target"
+        : !targets.rows ? "No target set"
+        : (allQuarters ? targets.rows + (targets.rows === 1 ? " team" : " teams") +
+                         (mode === "all" ? ", incl. International" : "")
+           : "FY target " + formatLakh(targets.fy));
 
     var html = "";
 
@@ -1971,23 +2060,27 @@ function renderAll() {
 
             populateGistOwnerFilter();
 
-            var owners = ownerSetFromNames(ownerNames, live);
+            var owners = resolveOwnerScope({ names: ownerNames, mode: mode }, live);
+            ownerNames = owners.names;
 
             if (Object.keys(owners.set).length === 0) {
-                showLiveError("No accounts are owned by " + ownerNames.join(", ") + ". Check the names in ALLOWED_ACCOUNT_OWNERS.");
+                showLiveError(mode === "others"
+                    ? "Every owner in CRM is already in the owner list, so there is nothing under Others."
+                    : "No accounts are owned by " + (ownerNames.join(", ") || selectedOwnerName) + ". Check the names in ALLOWED_ACCOUNT_OWNERS.");
                 return;
             }
 
             var metrics = computeDealMetrics(live, owners.set, gistSelection, selectedQuarter);
 
             updateAmountCards(metrics.cards, target, metrics.pipelineAccounts, metrics.leftOut);
-            renderTeamTable(computeTeamMetrics(live), live, ownerNames, gistSelection, selectedQuarter);
+            renderTeamTable(computeTeamMetrics(live), live, ownerNames, gistSelection, selectedQuarter, mode);
             renderExpectedBusiness(metrics, live, targets, owners.missing);
             renderStageFunnel(metrics);
 
             aorLive = {
                 live: live,
-                ownerNames: ownerNames.filter(function(n) { return owners.missing.indexOf(n) === -1; }),
+                ownerNames: summaryOwnerNames(owners, live, gistSelection),
+                scopeMode: mode,
                 wonLost: computeWonLost(live, selectedQuarter, gistSelection),
                 gistSelection: gistSelection,
                 ownerStats: null,
@@ -2007,7 +2100,8 @@ function renderAll() {
             var focus = computeFocusedStats(live, accounts, calls, dealStatus, selectedQuarter);
 
             setCardValue("focused", focus.focused);
-            setCardSub("focused", accountShareSub(focus.focused, focus.allAccounts) + " of this owner" +
+            setCardSub("focused", accountShareSub(focus.focused, focus.allAccounts) +
+                (mode === "list" ? " of this owner" : " in this view") +
                 '<br>Bucket only ' + focus.setAOnly + ', date only ' + focus.setBOnly + ', both ' + focus.bothSets);
             setCardValue("focused_touched", focus.touched);
             setCardSub("focused_touched", accountShareSub(focus.touched, focus.focused));
@@ -2053,6 +2147,23 @@ function showLiveError(message) {
         var el = document.getElementById("card-" + cat);
         if (el && el.classList.contains("waiting")) setCardValue(cat, "—");
     });
+}
+
+
+/* Overall / Others can have many owners - show the biggest ones so the table stays readable */
+function summaryOwnerNames(owners, live, gistSelection) {
+
+    if (owners.mode === "list") return owners.names.slice();
+
+    var counts = {};
+    filterAccounts(live, owners.set, gistSelection).forEach(function(a) {
+        counts[a.ownerName] = (counts[a.ownerName] || 0) + 1;
+    });
+
+    return owners.names
+        .filter(function(n) { return counts[n]; })
+        .sort(function(a, b) { return counts[b] - counts[a]; })
+        .slice(0, 20);
 }
 
 
@@ -2220,24 +2331,29 @@ function renderBucketTable(bucketSummary) {
  * "Others": achievement (Achieved card rules) that doesn't belong to any sales team,
  * e.g. deals owned by other users, or GIST HQ deals whose Gist Account Owner has no team.
  */
-function othersInScope(ownerNames) {
+function othersInScope(ownerNames, mode) {
+    if (mode === "all" || mode === "others") return true;
     return ownerNames.length > 1 || ownerNames.some(isGistHqName);
 }
 
 
-function othersDealMatches(ctx, ownerNames) {
-    if (teamIndexForDeal(ctx) !== -1) return false;
+/* a deal belongs to "Others" when its team row is not one of the rows on screen */
+function othersDealMatches(ctx, ownerNames, scopeIndices, mode) {
+    var index = teamIndexForDeal(ctx);
+    if (index !== -1 && (scopeIndices || []).indexOf(index) !== -1) return false;
+    if (mode === "all") return true;
+    if (mode === "others") return !isAllowedOwnerName(ctx.dealOwnerName);
     if (ownerNames.length === ALLOWED_ACCOUNT_OWNERS.length) return true;   // All Owners: any user
     return ownerNames.some(function(n) { return n.trim().toLowerCase() === ctx.dealOwnerName.trim().toLowerCase(); });
 }
 
 
-function computeOthers(live, ownerNames, gistSelection) {
+function computeOthers(live, ownerNames, gistSelection, scopeIndices, mode) {
     var o = { achievedFY: 0, achieved: {}, who: {} };
     QUARTERS.forEach(function(q) { o.achieved[q] = 0; });
     live.deals.forEach(function(deal) {
         var ctx = dealContext(deal, live, ALL_QUARTERS, gistSelection, true);
-        if (!ctx || !cardStageMatch(ctx, "achieved") || !othersDealMatches(ctx, ownerNames)) return;
+        if (!ctx || !cardStageMatch(ctx, "achieved") || !othersDealMatches(ctx, ownerNames, scopeIndices, mode)) return;
         o.achievedFY += ctx.amount;
         o.achieved[ctx.dateQuarters.actual] += ctx.amount;
         var who = isGistHqName(ctx.dealOwnerName) && ctx.account && ctx.account.gistNames.length
@@ -2248,21 +2364,22 @@ function computeOthers(live, ownerNames, gistSelection) {
 }
 
 
-function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter) {
+function renderTeamTable(teams, live, ownerNames, gistSelection, selectedQuarter, mode) {
 
     var wrap = document.getElementById("teamTargetWrap");
     if (!wrap) return;
 
-    var rows = teamRowsInScope(ownerNames, gistSelection);
-    var showOthers = othersInScope(ownerNames);
-    var others = showOthers ? computeOthers(live, ownerNames, gistSelection) : null;
+    var rows = teamRowsInScope(ownerNames, gistSelection, mode);
+    var scopeIndices = rows.map(function(item) { return item.index; });
+    var showOthers = othersInScope(ownerNames, mode);
+    var others = showOthers ? computeOthers(live, ownerNames, gistSelection, scopeIndices, mode) : null;
 
     // Accounts behind each team: same population as the Total Accounts card
-    var ownerSet = ownerSetFromNames(ownerNames, live).set;
+    var ownerSet = resolveOwnerScope({ names: ownerNames, mode: mode }, live).set;
     var teamAccounts = SALES_TEAM_TARGETS.map(function() { return 0; });
     var otherAccounts = 0;
     filterAccounts(live, ownerSet, gistSelection).forEach(function(a) {
-        if (a.teamIndex >= 0) teamAccounts[a.teamIndex]++;
+        if (a.teamIndex >= 0 && scopeIndices.indexOf(a.teamIndex) !== -1) teamAccounts[a.teamIndex]++;
         else otherAccounts++;
     });
 
@@ -2933,7 +3050,7 @@ function attachDrilldownHandlers() {
         el.onclick = function() {
             var category = el.getAttribute("data-cat");
             if (!category) return;
-            openDrilldown({ names: effectiveOwnerNames(), gist: currentGistSelection(), label: ownersLabel() }, category);
+            openDrilldown({ names: effectiveOwnerNames(), mode: ownerScopeMode(), gist: currentGistSelection(), label: ownersLabel() }, category);
         };
     });
 }
@@ -3093,18 +3210,20 @@ var CARD_LOGIC = {
 async function runCardDetail(scope, category) {
 
     var live = await loadLiveData();
-    var ownerSet = ownerSetFromNames(scope.names, live).set;
+    var ownerSet = resolveOwnerScope(scope, live).set;
     var gistSelection = scope.gist || [];
     var selectedQuarter = currentQuarterSelection();
 
     // ---- Target ----
     if (category === "target") {
-        var teamRows = teamRowsInScope(scope.names, gistSelection);
+        var teamRows = teamRowsInScope(scope.names || [], gistSelection, scope.mode);
         var rowsT = teamRows.map(function(item) {
             var row = item.row;
             var r = {
                 team: escapeHtml(row.team),
-                matchedBy: escapeHtml((row.owners || []).length ? "Owner: " + row.owners.join(", ") : "Gist Account Owner contains: " + (row.gist || []).join(", ")),
+                matchedBy: escapeHtml(row.international ? "Accounts with Billing Region = International"
+                    : (row.owners || []).length ? "Owner: " + row.owners.join(", ")
+                    : "Gist Account Owner contains: " + (row.gist || []).join(", ")),
                 fy: formatLakh(teamFyTarget(row)),
                 period: formatLakh(teamTarget(row, selectedQuarter))
             };
@@ -3338,7 +3457,7 @@ function sortNames(names) {
 async function runDrilldown(scope, category) {
 
     var live = await loadLiveData();
-    var ownerSet = ownerSetFromNames(scope.names, live).set;
+    var ownerSet = resolveOwnerScope(scope, live).set;
     var gistSelection = scope.gist || [];
     var selectedQuarter = currentQuarterSelection();
 
@@ -3350,13 +3469,15 @@ async function runDrilldown(scope, category) {
     if (kind === "team") {
 
         var isOthers = parts[1] === "others";
+        var scopeIndices = teamRowsInScope(scope.names || [], gistSelection, scope.mode).map(function(i) { return i.index; });
         var teamIndex = Number(parts[1]);
         var period = parts[2];
 
         live.deals.forEach(function(deal) {
             var ctx = dealContext(deal, live, ALL_QUARTERS, isOthers ? gistSelection : [], true);
             if (!ctx) return;
-            if (isOthers ? !othersDealMatches(ctx, scope.names) : teamIndexForDeal(ctx) !== teamIndex) return;
+            if (isOthers ? !othersDealMatches(ctx, scope.names || [], scopeIndices, scope.mode)
+                         : teamIndexForDeal(ctx) !== teamIndex) return;
             var isPipelineA = parts[3] === "pipelineA";
             var dealQuarter = isPipelineA ? ctx.dateQuarters.expected : ctx.dateQuarters.actual;
             if (period !== "FY" && dealQuarter !== period) return;
