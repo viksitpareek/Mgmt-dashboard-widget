@@ -229,7 +229,7 @@
    ========================================================= */
 
 /* Financial year: 1 April FY_START_YEAR to 31 March FY_START_YEAR + 1 */
-var WIDGET_VERSION = "v10 - Overall and Others views, USD x 95";
+var WIDGET_VERSION = "v11 - Company total / Sales team / Outside sales team";
 
 var FY_START_YEAR = 2026;
 var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2) value
@@ -288,7 +288,7 @@ var PIPELINE_OPEN_STAGES_ONLY = true;
 var PIPELINE_REQUIRE_SAME_OWNER = true;   // Current Pipeline card: deal owner must own the account
 var EXCLUDE_LOST_FROM_EXPECTED = true;    // Closed Lost isn't counted as expected business
 
-/* The dashboard only covers these account owners ("All Owners" = all of them) */
+/* The sales team: the account owners this dashboard was built around */
 /* ---- Focused accounts ----
  * Focused accounts = unique accounts of two sets:
  *   Set A: every account whose Bucket Type starts with 1, 2 or 3 (not 4, not blank)
@@ -362,8 +362,10 @@ var SALES_TEAM_TARGETS = [
 ];
 
 /* The two extra entries in the owner filter */
-var OVERALL_LABEL = "Overall (everything)";
-var OTHERS_LABEL = "Others (outside the owner list)";
+var OVERALL_LABEL = "Company total";
+var OTHERS_LABEL = "Outside sales team";
+var ALL_OWNERS_VALUE = "All Owners";                       // kept as the stored value
+var ALL_OWNERS_LABEL = "Sales team (" + ALLOWED_ACCOUNT_OWNERS.length + " owners)";
 
 var PLAN_COLORS = { "Plan A": "#d64550", "Plan B": "#f0b429", "Plan C": "#e8919c", "No Plan": "#9ca3af" };
 var EXTRA_PLAN_COLORS = ["#0ea5e9", "#8b5cf6", "#10b981", "#f97316", "#6b7280"];
@@ -446,22 +448,22 @@ function populateOwnerFilter() {
 
     var select = document.getElementById("ownerFilter");
     var html = '<option value="' + OVERALL_LABEL + '">' + OVERALL_LABEL + '</option>' +
-        '<option value="All Owners">All Owners (the ' + ALLOWED_ACCOUNT_OWNERS.length + ' below)</option>';
+        '<option value="' + ALL_OWNERS_VALUE + '">' + ALL_OWNERS_LABEL + '</option>' +
+        '<option value="' + OTHERS_LABEL + '">' + OTHERS_LABEL + '</option>' +
+        '<option disabled>──────────────</option>';
 
     ALLOWED_ACCOUNT_OWNERS.forEach(function(name) {
         html += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
     });
 
-    html += '<option value="' + OTHERS_LABEL + '">' + OTHERS_LABEL + '</option>';
-
     select.innerHTML = html;
     select.value = selectedOwnerName;
-    if (select.value !== selectedOwnerName) { selectedOwnerName = "All Owners"; select.value = "All Owners"; }
+    if (select.value !== selectedOwnerName) { selectedOwnerName = ALL_OWNERS_VALUE; select.value = ALL_OWNERS_VALUE; }
 }
 
 
 function onOwnerChange() {
-    selectedOwnerName = document.getElementById("ownerFilter").value || "All Owners";
+    selectedOwnerName = document.getElementById("ownerFilter").value || ALL_OWNERS_VALUE;
     if (!isGistHqName(selectedOwnerName)) selectedGistNames = [];
     renderAll();
 }
@@ -477,7 +479,7 @@ function ownerScopeMode() {
 
 function effectiveOwnerNames() {
     if (ownerScopeMode() !== "list") return [];        // resolved from CRM once the data is loaded
-    return selectedOwnerName === "All Owners" ? ALLOWED_ACCOUNT_OWNERS.slice() : [selectedOwnerName];
+    return selectedOwnerName === ALL_OWNERS_VALUE ? ALLOWED_ACCOUNT_OWNERS.slice() : [selectedOwnerName];
 }
 
 
@@ -2004,11 +2006,17 @@ function renderAll() {
     aorLive = null;
     updateSummaryTitle(selectedQuarter, gistSelection);
 
-    var targetSub = mode === "others" ? "Others has no target"
-        : !targets.rows ? "No target set"
-        : (allQuarters ? targets.rows + (targets.rows === 1 ? " team" : " teams") +
-                         (mode === "all" ? ", incl. International" : "")
-           : "FY target " + formatLakh(targets.fy));
+    var scopeNote = mode === "all" ? "All CRM owners, incl. international"
+        : mode === "others" ? "Everyone not in the sales team, no target"
+        : selectedOwnerName === ALL_OWNERS_VALUE ? ALLOWED_ACCOUNT_OWNERS.join(", ")
+        : "";
+
+    var subParts = [];
+    if (scopeNote) subParts.push(scopeNote);
+    else if (targets.rows) subParts.push(targets.rows + (targets.rows === 1 ? " team" : " teams"));
+    if (!allQuarters && targets.fy) subParts.push("FY target " + formatLakh(targets.fy));
+    if (!targets.rows && mode !== "others") subParts = ["No target set"];
+    var targetSub = subParts.join(" · ");
 
     var html = "";
 
@@ -2065,7 +2073,7 @@ function renderAll() {
 
             if (Object.keys(owners.set).length === 0) {
                 showLiveError(mode === "others"
-                    ? "Every owner in CRM is already in the owner list, so there is nothing under Others."
+                    ? "Every owner in CRM is already in the sales team, so there is nothing outside it."
                     : "No accounts are owned by " + (ownerNames.join(", ") || selectedOwnerName) + ". Check the names in ALLOWED_ACCOUNT_OWNERS.");
                 return;
             }
