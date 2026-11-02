@@ -38,6 +38,7 @@
         .multi-menu {
             display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; min-width: 230px;
             background: #ffffff; border: 1px solid #d1d5db; border-radius: 6px; box-shadow: 0 8px 20px rgba(0,0,0,0.12); padding: 6px 0;
+            max-height: 320px; overflow-y: auto;
         }
         .multi-select.open .multi-menu { display: block; }
         .multi-option { display: flex; align-items: center; gap: 8px; padding: 7px 12px; font-size: 14px; color: #1f2937; cursor: pointer; }
@@ -189,6 +190,19 @@
                 <div class="multi-select" id="gistMulti">
                     <button type="button" class="multi-button" id="gistMultiButton" onclick="toggleGistMenu(event)">All Gist Account Owners &#9662;</button>
                     <div class="multi-menu" id="gistMultiMenu"></div>
+                </div>
+            </div>
+            <div class="filter-group">
+                <label for="regionFilter">Region</label>
+                <select id="regionFilter" onchange="onRegionChange()">
+                    <option value="__all_regions__">All Regions</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Deal product (untick to remove)</label>
+                <div class="multi-select" id="productMulti">
+                    <button type="button" class="multi-button" id="productMultiButton" onclick="toggleProductMenu(event)">All products &#9662;</button>
+                    <div class="multi-menu" id="productMultiMenu"></div>
                 </div>
             </div>
             <div class="filter-group">
@@ -406,6 +420,15 @@ var selectedOwnerName = "All Owners";
 var selectedGistNames = [];    // empty = all Gist Account Owners
 var renderToken = 0;
 
+/* Region filter: one region at a time, read from the account's Billing Region */
+var ALL_REGIONS = "__all_regions__";
+var selectedRegion = ALL_REGIONS;
+
+/* Product filter: everything counts until a product is ticked off, so a product
+   added in CRM later is included without anyone editing this widget. */
+var NO_PRODUCT_LABEL = "(No product)";
+var removedProducts = [];
+
 var liveDataPromise = null;
 var liveResolved = null;
 var fieldInfo = null;
@@ -547,9 +570,140 @@ function toggleGistMenu(event) {
 
 
 document.addEventListener("click", function(event) {
-    var box = document.getElementById("gistMulti");
-    if (box && !box.contains(event.target)) box.classList.remove("open");
+    ["gistMulti", "productMulti"].forEach(function(id) {
+        var box = document.getElementById(id);
+        if (box && !box.contains(event.target)) box.classList.remove("open");
+    });
 });
+
+
+/* ---------------- Region ---------------- */
+
+function populateRegionFilter() {
+
+    var select = document.getElementById("regionFilter");
+    var values = liveResolved ? liveResolved.regionValues : [];
+
+    var html = '<option value="' + ALL_REGIONS + '">All Regions</option>';
+    values.forEach(function(name) {
+        html += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
+    });
+    select.innerHTML = html;
+
+    // A region that no longer exists in the data falls back to all
+    if (selectedRegion !== ALL_REGIONS && values.indexOf(selectedRegion) === -1) {
+        selectedRegion = ALL_REGIONS;
+    }
+    select.value = selectedRegion;
+}
+
+
+function onRegionChange() {
+    selectedRegion = document.getElementById("regionFilter").value || ALL_REGIONS;
+    renderAll();
+}
+
+
+function regionFilterActive() {
+    return selectedRegion !== ALL_REGIONS;
+}
+
+
+/* An account passes when no region is chosen, or its Billing Region matches */
+function accountMatchesRegion(account) {
+    if (!regionFilterActive()) return true;
+    if (!account) return false;
+    return String(account.region || "").trim().toLowerCase() === selectedRegion.trim().toLowerCase();
+}
+
+
+/* ---------------- Deal product ---------------- */
+
+function productSelectionLabel() {
+    var values = liveResolved ? liveResolved.productValues : [];
+    var kept = values.filter(function(p) { return removedProducts.indexOf(p) === -1; });
+    if (!values.length || removedProducts.length === 0) return "All products";
+    if (kept.length === 0) return "No products";
+    if (kept.length <= 2) return kept.join(", ");
+    return kept.length + " of " + values.length + " products";
+}
+
+
+function populateProductFilter() {
+
+    var menu = document.getElementById("productMultiMenu");
+    var values = liveResolved ? liveResolved.productValues : [];
+
+    // Forget anything ticked off that is no longer in the data
+    if (liveResolved) {
+        removedProducts = removedProducts.filter(function(p) { return values.indexOf(p) !== -1; });
+    }
+
+    var html = '<label class="multi-option all"><input type="checkbox" value="__all__" onchange="onProductCheckbox(this)"' +
+        (removedProducts.length === 0 ? ' checked' : '') + '> All products</label>';
+
+    if (!liveResolved) html += '<div class="multi-option">Loading products...</div>';
+    else if (values.length === 0) html += '<div class="multi-option">No Product values found</div>';
+
+    values.forEach(function(name, i) {
+        html += '<label class="multi-option"><input type="checkbox" data-index="' + i + '" onchange="onProductCheckbox(this)"' +
+            (removedProducts.indexOf(name) === -1 ? ' checked' : '') + '> ' + escapeHtml(name) + '</label>';
+    });
+
+    menu.innerHTML = html;
+    document.getElementById("productMultiButton").innerHTML = escapeHtml(productSelectionLabel()) + ' &#9662;';
+}
+
+
+function toggleProductMenu(event) {
+    if (event) event.stopPropagation();
+    document.getElementById("productMulti").classList.toggle("open");
+}
+
+
+function onProductCheckbox(input) {
+
+    var values = liveResolved ? liveResolved.productValues : [];
+
+    if (input.value === "__all__") {
+        removedProducts = input.checked ? [] : values.slice();
+    } else {
+        var name = values[Number(input.getAttribute("data-index"))];
+        if (!name) return;
+        if (input.checked) {
+            removedProducts = removedProducts.filter(function(p) { return p !== name; });
+        } else if (removedProducts.indexOf(name) === -1) {
+            removedProducts.push(name);
+        }
+    }
+
+    renderAll();
+    document.getElementById("productMulti").classList.add("open");
+}
+
+
+function productFilterActive() {
+    return removedProducts.length > 0;
+}
+
+
+/* A deal passes while it still carries one product that has not been ticked off.
+   A deal with no product at all answers to the "(No product)" entry. */
+function dealMatchesProducts(deal) {
+    if (!productFilterActive()) return true;
+    var list = (fieldInfo && fieldInfo.product.found) ? fieldValueList(deal[fieldInfo.product.api]) : [];
+    var named = list.map(function(p) { return String(p || "").trim(); })
+                    .filter(function(p) { return p !== ""; });
+    if (named.length === 0) return removedProducts.indexOf(NO_PRODUCT_LABEL) === -1;
+    return named.some(function(p) { return removedProducts.indexOf(p) === -1; });
+}
+
+
+/* True when either new filter is narrowing the data, which the hardcoded
+   targets know nothing about */
+function narrowingFiltersActive() {
+    return regionFilterActive() || productFilterActive();
+}
 
 
 function onGistCheckbox(input) {
@@ -1104,6 +1258,30 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts, demoResult) {
     var gistValues = Object.keys(gistSet).sort(function(a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
     if (gistHasEmpty) gistValues.push(GIST_NOT_ASSIGNED);
 
+    /* Billing Region values actually in use, for the region filter */
+    var regionSet = {};
+    Object.keys(accountsById).forEach(function(id) {
+        var r = String(accountsById[id].region || "").trim();
+        if (r) regionSet[r] = true;
+    });
+    var regionValues = Object.keys(regionSet).sort(function(a, b) {
+        return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    /* Product values across the deals in play, plus an entry for deals carrying none */
+    var productSet = {};
+    var productHasEmpty = false;
+    deals.forEach(function(d) {
+        var list = fieldInfo.product.found ? fieldValueList(d[fieldInfo.product.api]) : [];
+        var named = list.filter(function(p) { return String(p || "").trim() !== ""; });
+        if (named.length === 0) productHasEmpty = true;
+        named.forEach(function(p) { productSet[String(p).trim()] = true; });
+    });
+    var productValues = Object.keys(productSet).sort(function(a, b) {
+        return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+    if (productHasEmpty) productValues.push(NO_PRODUCT_LABEL);
+
     var outsideWindow = fyDeals.filter(function(d) {
         return !isRemovedStage(d.Stage) && !stageDateQuarter(d);
     }).length;
@@ -1162,6 +1340,8 @@ function buildLiveData(dealMeta, accountMeta, deals, accounts, demoResult) {
         ownerIdByName: ownerIdByName,
         allOwners: allOwners,
         gistValues: gistValues,
+        regionValues: regionValues,
+        productValues: productValues,
         gistHqAccountCount: gistHqAccounts.length,
         teamAccountCounts: teamAccountCounts,
         yearDealCount: deals.filter(function(d) { return dealFiscalYear(d) === FY_FILTER; }).length,
@@ -1424,6 +1604,8 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
 
     var account = live.accountsById[accId] || null;
     if (!accountMatchesGist(account, gistSelection)) return null;
+    if (!accountMatchesRegion(account)) return null;
+    if (!dealMatchesProducts(deal)) return null;
 
     var dateQuarters = dealDateQuarters(deal);
     var quarter = stageDateQuarter(deal, dateQuarters);
@@ -1996,6 +2178,8 @@ function renderAll() {
     var selectedQuarter = currentQuarterSelection();
 
     populateGistOwnerFilter();
+    populateRegionFilter();
+    populateProductFilter();
 
     var gistSelection = currentGistSelection();
     var period = periodLabel(selectedQuarter);
@@ -2019,6 +2203,24 @@ function renderAll() {
     var targetSub = subParts.join(" · ");
 
     var html = "";
+
+    // Targets are fixed per team for the full year and every product, so say so
+    // plainly while a region or product filter is cutting the actuals.
+    if (narrowingFiltersActive()) {
+        var activeBits = [];
+        if (regionFilterActive()) activeBits.push("Region: " + escapeHtml(selectedRegion));
+        if (productFilterActive()) {
+            activeBits.push(removedProducts.length + " product" +
+                (removedProducts.length === 1 ? "" : "s") + " removed (" +
+                escapeHtml(removedProducts.join(", ")) + ")");
+        }
+        html += '<div style="margin-bottom:14px;padding:10px 14px;border:1px solid #fcd34d;' +
+            'background:#fffbeb;border-radius:6px;font-size:13px;color:#78350f;">' +
+            '<strong>Filtered view.</strong> ' + activeBits.join(" &nbsp;&middot;&nbsp; ") +
+            '. Targets are fixed per team for the whole year and all products, so every ' +
+            '&ldquo;% of target&rdquo; below compares a filtered actual against an unfiltered target.' +
+            '</div>';
+    }
 
     html += '<div class="card-row">';
     html += cardHtml("Target (" + (allQuarters ? FY_LONG_LABEL : selectedQuarter) + ")", formatLakh(target), "target", "target", escapeHtml(targetSub));
@@ -2233,7 +2435,14 @@ function accountShareSub(count, total) {
 
 function targetShareSub(amountLakh, targetLakh) {
     var pct = percentText(amountLakh, targetLakh);
-    return pct ? '<strong>' + pct + '</strong> of ' + formatLakh(targetLakh) + ' target' : "No target set";
+    if (!pct) return "No target set";
+    // Targets are set per team for the whole year and every product, so a
+    // region or product filter cuts the actual without cutting the target.
+    if (narrowingFiltersActive()) {
+        return '<strong>' + pct + '</strong> of ' + formatLakh(targetLakh) +
+            ' target <span style="color:#b45309">(target not filtered)</span>';
+    }
+    return '<strong>' + pct + '</strong> of ' + formatLakh(targetLakh) + ' target';
 }
 
 
