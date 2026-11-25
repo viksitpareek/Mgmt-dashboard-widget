@@ -244,7 +244,7 @@
    ========================================================= */
 
 /* Financial year: 1 April FY_START_YEAR to 31 March FY_START_YEAR + 1 */
-var WIDGET_VERSION = "v12 - Month-wise Quarter x Plan";
+var WIDGET_VERSION = "v13 - Owner filter, Gist list, pipeline details";
 
 var FY_START_YEAR = 2026;
 var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2) value
@@ -322,13 +322,19 @@ var TOUCHED_WINDOW_DAYS = 45;
 var DEMO_MODULE = "";
 var DEMO_FIELDS = { account: "", date: "" };
 
-var ALLOWED_ACCOUNT_OWNERS = ["Anurag Mishra", "Tejal Pandya", "Ashish Kumar", "GIST HQ"];
+var ALLOWED_ACCOUNT_OWNERS = ["Anurag Mishra", "Tejal Pandya", "GIST HQ", "Ashish Kumar"];
 
 /*
  * Accounts are counted (Total / Touched / Untouched, bucket table, summary)
  * only if they have at least one deal with Deal Type New (any Product).
  */
 var GIST_HQ_OWNER_NAME = "GIST HQ";
+
+/* Gist Account Owner filter (shown for GIST HQ): these names + "Others" (every other / blank value).
+   Matching ignores case, spaces and dots. */
+var GIST_OWNER_OPTIONS = ["Abhishek Narayan Singh", "Girish Kulkarni", "Karthikeyan K", "Mohd Suhail",
+    "Prasad Gawande", "Ruchi Shah", "Sharansh Gond", "Vivekananda R"];
+var GIST_OTHERS_LABEL = "Others";
 
 /* ---- Stages ---- */
 
@@ -377,8 +383,9 @@ var SALES_TEAM_TARGETS = [
 ];
 
 /* The two extra entries in the owner filter */
-var OVERALL_LABEL = "Company total";
-var OTHERS_LABEL = "Outside sales team";
+var OVERALL_LABEL = "Company Total";
+var INTERNATIONAL_LABEL = "International";   // accounts with Billing Region = International (any owner)
+var OTHERS_LABEL = "Others";                 // owners outside the sales team, international accounts left out
 var ALL_OWNERS_VALUE = "All Owners";                       // kept as the stored value
 var ALL_OWNERS_LABEL = "Sales team (" + ALLOWED_ACCOUNT_OWNERS.length + " owners)";
 
@@ -441,7 +448,7 @@ var CLOSED_LOST_KEYS = STAGE_GROUPS.filter(function(g) { return g.name === "Clos
 var PAYMENT_RECEIVED_KEYS = PAYMENT_RECEIVED_STAGES.map(normStage);
 var PAYMENT_PENDING_KEYS = PAYMENT_PENDING_STAGES.map(normStage);
 
-var selectedOwnerName = "All Owners";
+var selectedOwnerName = OVERALL_LABEL;
 var selectedGistNames = [];    // empty = all Gist Account Owners
 var renderToken = 0;
 
@@ -497,33 +504,46 @@ function populateQuarterFilter() {
 function populateOwnerFilter() {
 
     var select = document.getElementById("ownerFilter");
-    var html = '<option value="' + OVERALL_LABEL + '">' + OVERALL_LABEL + '</option>' +
-        '<option value="' + ALL_OWNERS_VALUE + '">' + ALL_OWNERS_LABEL + '</option>' +
-        '<option value="' + OTHERS_LABEL + '">' + OTHERS_LABEL + '</option>' +
-        '<option disabled>──────────────</option>';
+    // Company Total, the sales team owners, International, Others
+    var html = '<option value="' + OVERALL_LABEL + '">' + OVERALL_LABEL + '</option>';
 
     ALLOWED_ACCOUNT_OWNERS.forEach(function(name) {
         html += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>';
     });
 
+    html += '<option value="' + INTERNATIONAL_LABEL + '">' + INTERNATIONAL_LABEL + '</option>' +
+        '<option value="' + OTHERS_LABEL + '">' + OTHERS_LABEL + '</option>';
+
     select.innerHTML = html;
     select.value = selectedOwnerName;
-    if (select.value !== selectedOwnerName) { selectedOwnerName = ALL_OWNERS_VALUE; select.value = ALL_OWNERS_VALUE; }
+    if (select.value !== selectedOwnerName) { selectedOwnerName = OVERALL_LABEL; select.value = OVERALL_LABEL; }
 }
 
 
 function onOwnerChange() {
-    selectedOwnerName = document.getElementById("ownerFilter").value || ALL_OWNERS_VALUE;
+    selectedOwnerName = document.getElementById("ownerFilter").value || OVERALL_LABEL;
     if (!isGistHqName(selectedOwnerName)) selectedGistNames = [];
     renderAll();
 }
 
 
-/* "list" = named owners, "all" = every owner in CRM, "others" = everyone outside the owner list */
+/* "list" = named owners, "all" = every owner in CRM, "others" = everyone outside the owner list,
+   "international" = every owner, only accounts with Billing Region = International */
 function ownerScopeMode() {
     if (selectedOwnerName === OVERALL_LABEL) return "all";
     if (selectedOwnerName === OTHERS_LABEL) return "others";
+    if (selectedOwnerName === INTERNATIONAL_LABEL) return "international";
     return "list";
+}
+
+
+/* Account rule of the owner filter: International keeps only international accounts,
+   Others leaves them out (they have their own option). Other choices keep every account. */
+function accountMatchesOwnerScope(account) {
+    var mode = ownerScopeMode();
+    if (mode === "international") return !!account && !!account.isInternational;
+    if (mode === "others") return !account || !account.isInternational;
+    return true;
 }
 
 
@@ -569,20 +589,25 @@ function populateGistOwnerFilter() {
 
     group.classList.toggle("hidden", !showGist);
 
-    var values = liveResolved ? liveResolved.gistValues : [];
+    var values = gistFilterOptions();
+    selectedGistNames = selectedGistNames.filter(function(n) { return values.indexOf(n) !== -1; });
 
-    // Drop selections that no longer exist
-    if (liveResolved) selectedGistNames = selectedGistNames.filter(function(n) { return values.indexOf(n) !== -1; });
+    // CRM values that land in "Others" (shown on hover)
+    var otherValues = liveResolved ? liveResolved.gistValues.filter(function(n) {
+        return n !== GIST_NOT_ASSIGNED && !isListedGistName(n);
+    }) : [];
+    var othersTitle = "Every other Gist Account Owner, and accounts with none" +
+        (otherValues.length ? ": " + otherValues.join(", ") : "");
 
     var html = '<label class="multi-option all"><input type="checkbox" value="__all__" onchange="onGistCheckbox(this)"' +
         (selectedGistNames.length === 0 ? ' checked' : '') + '> All Gist Account Owners</label>';
 
-    if (!liveResolved) html += '<div class="multi-option">Loading names...</div>';
-    else if (values.length === 0) html += '<div class="multi-option">No Gist Account Owner values found</div>';
-
     values.forEach(function(name, i) {
-        html += '<label class="multi-option"><input type="checkbox" data-index="' + i + '" onchange="onGistCheckbox(this)"' +
-            (selectedGistNames.indexOf(name) !== -1 ? ' checked' : '') + '> ' + escapeHtml(name) + '</label>';
+        var isOthers = name === GIST_OTHERS_LABEL;
+        html += '<label class="multi-option"' + (isOthers ? ' title="' + escapeHtml(othersTitle) + '"' : '') +
+            '><input type="checkbox" data-index="' + i + '" onchange="onGistCheckbox(this)"' +
+            (selectedGistNames.indexOf(name) !== -1 ? ' checked' : '') + '> ' + escapeHtml(name) +
+            (isOthers ? ' <span style="color:#6b7280;">(rest all)</span>' : '') + '</label>';
     });
 
     menu.innerHTML = html;
@@ -735,7 +760,7 @@ function narrowingFiltersActive() {
 
 function onGistCheckbox(input) {
 
-    var values = liveResolved ? liveResolved.gistValues : [];
+    var values = gistFilterOptions();
 
     if (input.value === "__all__") {
         selectedGistNames = [];
@@ -839,6 +864,10 @@ function teamRowsInScope(ownerNames, gistSelection, mode) {
     var includesGist = (ownerNames || []).some(isGistHqName);
 
     if (mode === "others") return [];                      // Others has no target
+    if (mode === "international") {
+        return SALES_TEAM_TARGETS.map(function(row, index) { return { row: row, index: index }; })
+            .filter(function(item) { return item.row.international; });
+    }
     if (mode === "all") {
         return SALES_TEAM_TARGETS.map(function(row, index) { return { row: row, index: index }; });
     }
@@ -1623,8 +1652,29 @@ function hasExcludedProduct(ctx) {
 function accountMatchesGist(account, gistSelection) {
     if (!gistSelection || !gistSelection.length) return true;
     if (!account) return false;
-    if (gistSelection.indexOf(GIST_NOT_ASSIGNED) !== -1 && account.gistNames.length === 0) return true;
-    return account.gistNames.some(function(n) { return gistSelection.indexOf(n) !== -1; });
+    var names = account.gistNames || [];
+    return gistSelection.some(function(sel) {
+        if (sel === GIST_OTHERS_LABEL) return !names.some(isListedGistName);
+        if (sel === GIST_NOT_ASSIGNED) return names.length === 0;
+        var key = gistKey(sel);
+        return names.some(function(n) { return gistKey(n) === key; });
+    });
+}
+
+
+function gistKey(name) {
+    return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+
+function isListedGistName(name) {
+    var key = gistKey(name);
+    return GIST_OWNER_OPTIONS.some(function(o) { return gistKey(o) === key; });
+}
+
+
+function gistFilterOptions() {
+    return GIST_OWNER_OPTIONS.concat([GIST_OTHERS_LABEL]);
 }
 
 
@@ -1644,6 +1694,7 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
     var account = live.accountsById[accId] || null;
     if (!accountMatchesGist(account, gistSelection)) return null;
     if (!accountMatchesRegion(account)) return null;
+    if (!accountMatchesOwnerScope(account)) return null;
     if (!dealMatchesProducts(deal)) return null;
 
     var dateQuarters = dealDateQuarters(deal);
@@ -1693,7 +1744,7 @@ function isPipelineDeal(ctx, applyProductRule) {
 }
 
 
-/* Resolve a scope ("list" / "all" / "others") into owner ids and the owner names behind them */
+/* Resolve a scope ("list" / "all" / "others" / "international") into owner ids and the owner names behind them */
 function resolveOwnerScope(scope, live) {
 
     var mode = scope.mode || "list";
@@ -2023,6 +2074,7 @@ function filterAccounts(live, ownerSet, gistSelection) {
         var a = live.accountsById[id];
         if (!a.inScope) return;
         if (!ownerSet[a.ownerId]) return;
+        if (!accountMatchesOwnerScope(a)) return;
         if (!accountMatchesGist(a, gistSelection)) return;
         list.push(a);
     });
@@ -2243,7 +2295,8 @@ function renderAll() {
     updateSummaryTitle(selectedQuarter, gistSelection);
 
     var scopeNote = mode === "all" ? "All CRM owners, incl. international"
-        : mode === "others" ? "Everyone not in the sales team, no target"
+        : mode === "international" ? "Accounts with Billing Region = International"
+        : mode === "others" ? "Owners outside the sales team (international left out), no target"
         : selectedOwnerName === ALL_OWNERS_VALUE ? ALLOWED_ACCOUNT_OWNERS.join(", ")
         : "";
 
@@ -3412,11 +3465,13 @@ function openDrilldown(scope, category) {
         (isDetail ? " (" + periodLabel(currentQuarterSelection()) + ")" : "");
     body.innerHTML = "Loading...";
 
-    box.classList.toggle("wide", isDetail);
+    box.classList.add("wide");
     positionModal(modal, box);
     modal.classList.add("open");
 
-    var work = isDetail ? runCardDetail(scope, category) : runDrilldown(scope, category).then(renderNameList);
+    var work = isDetail ? runCardDetail(scope, category) : runDrilldown(scope, category).then(function(result) {
+        return result && result.accountIds ? accountListDetail(scope, category, result) : renderNameList(result);
+    });
 
     work
         .then(function(html) {
@@ -3636,47 +3691,9 @@ async function runCardDetail(scope, category) {
         if (category === "untouched" && (lastCall || account.lostOnly)) return;
         if (category === "touched" && (!lastCall || account.lostOnly)) return;
 
-        var newDeals = live.newDealsByAccount[account.id] || [];
-        var fyNewDeals = newDeals.filter(function(d) { return dealFiscalYear(d) === FY_FILTER; });
-        var eb = fyNewDeals.reduce(function(s, d) { return s + dealAmountLakh(d); }, 0);
-        var ref = latestDeal(fyNewDeals.length ? fyNewDeals : newDeals);
-        ebTotal += eb;
-
-        var lostDeals = newDeals.filter(function(d) { return isClosedLostStage(d.Stage); });
-        var lastLost = lostDeals.map(function(d) { return ddParseDate(d[fieldInfo.closingDate.api]); })
-            .filter(Boolean).sort(function(a, b) { return b - a; })[0];
-
-        var status = "Untouched";
-        if (account.lostOnly) {
-            status = "Lost - No Follow-up";
-        } else if (lastCall) {
-            var age = agingOf(lastCall);
-            status = age === "last_30" ? "Touched, last 30 days" : (age === "days_31_60" ? "Touched, 31-60 days" : "Touched, 60+ days");
-        }
-
-        var demoEntry = live.demoQuarters[account.id];
-
-        rowsA.push({
-            sortKey: account.name.toLowerCase(),
-            account: escapeHtml(account.name),
-            focused: account.focused ? "Yes" : "No",
-            focusSet: account.setA && account.setB ? "A + B" : account.setA ? "A (bucket)" : account.setB ? "B (date)" : "—",
-            focusReason: escapeHtml(account.focusReason || ""),
-            demoDate: demoEntry && demoEntry.last ? fmtDate(demoEntry.last.toISOString().slice(0, 10)) : "—",
-            owner: escapeHtml(account.ownerName),
-            gist: escapeHtml(account.gistNames.join(", ") || "—"),
-            bucket: escapeHtml(account.bucket),
-            newDeals: String(newDeals.length),
-            lastCall: lastCall ? fmtDate(lastCall.toISOString().slice(0, 10)) : "—",
-            daysSince: lastCall ? String(Math.floor((now - lastCall) / 86400000)) : "—",
-            status: status,
-            lostDeals: String(lostDeals.length),
-            lastLost: lastLost ? fmtDate(lastLost.toISOString().slice(0, 10)) : "—",
-            expectedBusiness: formatLakh(eb),
-            paymentReceivingDate: ref ? fmtDate(fieldValueText(ref[fieldInfo.paymentDate.api])) : "—",
-            ouCode: detailValue(fieldInfo.ouCode, ref, account),
-            subStartDate: detailValue(fieldInfo.subStartDate, ref, account)
-        });
+        var rowA = accountDetailRow(live, account, lastCall, now);
+        ebTotal += rowA.ebValue;
+        rowsA.push(rowA);
     });
 
     rowsA.sort(function(a, b) { return a.sortKey.localeCompare(b.sortKey); });
@@ -3730,6 +3747,125 @@ async function runCardDetail(scope, category) {
 }
 
 
+/* One account row, as shown in the account card popups (Touched, Untouched, ...) */
+function accountDetailRow(live, account, lastCall, now) {
+
+    var newDeals = live.newDealsByAccount[account.id] || [];
+    var fyNewDeals = newDeals.filter(function(d) { return dealFiscalYear(d) === FY_FILTER; });
+    var eb = fyNewDeals.reduce(function(s, d) { return s + dealAmountLakh(d); }, 0);
+    var ref = latestDeal(fyNewDeals.length ? fyNewDeals : newDeals);
+
+    var lostDeals = newDeals.filter(function(d) { return isClosedLostStage(d.Stage); });
+    var lastLost = lostDeals.map(function(d) { return ddParseDate(d[fieldInfo.closingDate.api]); })
+        .filter(Boolean).sort(function(a, b) { return b - a; })[0];
+
+    var status = "Untouched";
+    if (account.lostOnly) {
+        status = "Lost - No Follow-up";
+    } else if (lastCall) {
+        var age = agingOf(lastCall);
+        status = age === "last_30" ? "Touched, last 30 days" : (age === "days_31_60" ? "Touched, 31-60 days" : "Touched, 60+ days");
+    }
+
+    var demoEntry = live.demoQuarters[account.id];
+
+    return {
+        sortKey: account.name.toLowerCase(),
+        ebValue: eb,
+        account: escapeHtml(account.name),
+        focused: account.focused ? "Yes" : "No",
+        focusSet: account.setA && account.setB ? "A + B" : account.setA ? "A (bucket)" : account.setB ? "B (date)" : "—",
+        focusReason: escapeHtml(account.focusReason || ""),
+        demoDate: demoEntry && demoEntry.last ? fmtDate(demoEntry.last.toISOString().slice(0, 10)) : "—",
+        owner: escapeHtml(account.ownerName),
+        gist: escapeHtml(account.gistNames.join(", ") || "—"),
+        bucket: escapeHtml(account.bucket),
+        newDeals: String(newDeals.length),
+        lastCall: lastCall ? fmtDate(lastCall.toISOString().slice(0, 10)) : "—",
+        daysSince: lastCall ? String(Math.floor((now - lastCall) / 86400000)) : "—",
+        status: status,
+        lostDeals: String(lostDeals.length),
+        lastLost: lastLost ? fmtDate(lastLost.toISOString().slice(0, 10)) : "—",
+        expectedBusiness: formatLakh(eb),
+        paymentReceivingDate: ref ? fmtDate(fieldValueText(ref[fieldInfo.paymentDate.api])) : "—",
+        ouCode: detailValue(fieldInfo.ouCode, ref, account),
+        subStartDate: detailValue(fieldInfo.subStartDate, ref, account)
+    };
+}
+
+
+/* Pipeline, Quarter x Plan, Stage, bucket, won/lost ... popups: the same account details as Touched */
+async function accountListDetail(scope, category, result) {
+
+    var live = await loadLiveData();
+    var ownerSet = resolveOwnerScope(scope, live).set;
+    var accounts = result.accountIds.map(function(id) { return live.accountsById[id]; }).filter(Boolean);
+    var calls = await getCallsForOwners(ownerSet);
+    var latest = latestOwnerCalls(accounts, calls);
+    var now = new Date();
+    var extras = result.extras;
+    var rows = [];
+    var ebTotal = 0, viewTotal = 0, dealCount = 0;
+
+    accounts.forEach(function(account) {
+        var row = accountDetailRow(live, account, latest[account.id], now);
+        ebTotal += row.ebValue;
+        if (extras) {
+            var e = extras[account.id] || { amount: 0, deals: [] };
+            viewTotal += e.amount;
+            dealCount += e.deals.length;
+            row.viewAmount = formatLakh(e.amount);
+            row.viewDeals = escapeHtml(e.deals.join(", "));
+        }
+        rows.push(row);
+    });
+
+    // accounts with deals but no account record in the loaded list
+    result.accountIds.forEach(function(id) {
+        if (live.accountsById[id]) return;
+        var name = (result.namesById && result.namesById[id]) || id;
+        var e = extras && extras[id];
+        rows.push({ sortKey: String(name).toLowerCase(), account: escapeHtml(name), viewAmount: e ? formatLakh(e.amount) : "—",
+                    viewDeals: e ? escapeHtml(e.deals.join(", ")) : "—" });
+        if (e) { viewTotal += e.amount; dealCount += e.deals.length; }
+    });
+
+    rows.sort(function(a, b) { return a.sortKey.localeCompare(b.sortKey); });
+
+    var showGist = accounts.some(function(a) { return a.gistNames.length; });
+    var cols = [
+        { key: "account", title: "Account", left: true },
+        { key: "owner", title: "Owner", left: true }
+    ];
+    if (showGist) cols.push({ key: "gist", title: "Gist Account Owner", left: true });
+    if (extras) {
+        cols.push({ key: "viewDeals", title: "Deals in this view", left: true, logic: true });
+        cols.push({ key: "viewAmount", title: "Amount in this view", logic: true });
+    }
+    cols = cols.concat([
+        { key: "newDeals", title: "Deal Type New Deals" },
+        { key: "lastCall", title: "Last Call by Owner" },
+        { key: "daysSince", title: "Days Since Call" },
+        { key: "status", title: "Status", left: true },
+        { key: "lostDeals", title: "Closed Lost Deals" },
+        { key: "lastLost", title: "Last Closing Date (lost)" },
+        { key: "bucket", title: "Bucket", left: true },
+        { key: "expectedBusiness", title: "Expected Business (" + FY_SHORT_LABEL + ")" },
+        { key: "paymentReceivingDate", title: "Payment Receiving Date" },
+        { key: "ouCode", title: "OU Code" },
+        { key: "subStartDate", title: "Sub Start Date" }
+    ]);
+
+    var summary = '<div class="modal-summary"><strong>' + accountsLabel(rows.length) + '</strong>' +
+        (extras ? ', ' + dealCount + (dealCount === 1 ? ' deal' : ' deals') + ', amount in this view <strong>' + formatLakh(viewTotal) + '</strong>' : '') +
+        ', Expected Business (' + FY_SHORT_LABEL + ', all Deal Type New deals of these accounts) <strong>' + formatLakh(ebTotal) + '</strong>.' +
+        (extras ? '<br>Highlighted columns are the deals and amount behind the number you clicked.' : '') +
+        ' Last Call by Owner = latest call by the account owner on the account or its deals.' + missingDetailNote() + '</div>';
+
+    return detailTable(cols, rows, summary);
+}
+
+
 function missingDetailNote() {
     var missing = [["paymentDate", "Payment Receiving Date"], ["paymentAmount", "Payment Received Amount"], ["ouCode", "OU Code"], ["subStartDate", "Sub Start Date"]]
         .filter(function(pair) { return !fieldInfo[pair[0]].found; })
@@ -3759,6 +3895,13 @@ async function runDrilldown(scope, category) {
     var parts = category.split(":");
     var kind = parts[0];
     var unique = {};
+    var extras = {};   // accId -> { amount, deals } for deal-based popups
+
+    function addExtra(ctx, deal, amount) {
+        var e = extras[ctx.accId] || (extras[ctx.accId] = { amount: 0, deals: [] });
+        e.amount += amount;
+        e.deals.push(deal.Deal_Name || "(No name)");
+    }
 
     // ---- Target vs Achievement ----
     if (kind === "team") {
@@ -3779,10 +3922,10 @@ async function runDrilldown(scope, category) {
             var ok = isPipelineA
                 ? cardStageMatch(ctx, "current_pipeline_all_products") && ctx.plan.trim().toLowerCase() === "plan a"
                 : cardStageMatch(ctx, "achieved");
-            if (ok) unique[ctx.accId] = ctx.accName;
+            if (ok) { unique[ctx.accId] = ctx.accName; addExtra(ctx, deal, ctx.amount); }
         });
 
-        return sortNames(Object.values(unique));
+        return withAccountIds(unique, extras);
     }
 
     // ---- Deal-based ----
@@ -3821,10 +3964,10 @@ async function runDrilldown(scope, category) {
                 }
             }
 
-            if (ok) unique[ctx.accId] = ctx.accName;
+            if (ok) { unique[ctx.accId] = ctx.accName; addExtra(ctx, deal, isCard ? cardAmount(ctx, category) : ctx.amount); }
         });
 
-        return sortNames(Object.values(unique));
+        return withAccountIds(unique, extras);
     }
 
     // ---- Account-based (Deal Type New accounts) ----
@@ -3859,10 +4002,20 @@ async function runDrilldown(scope, category) {
             else isMatch = !account.lostOnly && age === parts[2];
         }
 
-        if (isMatch) matches.push(account.name);
+        if (isMatch) unique[account.id] = account.name;
     });
 
-    return sortNames(matches);
+    return withAccountIds(unique, null);
+}
+
+
+/* Name list that also carries the account ids, so the popup can show full account details */
+function withAccountIds(unique, extras) {
+    var names = sortNames(Object.values(unique));
+    names.accountIds = Object.keys(unique);
+    names.namesById = unique;
+    names.extras = extras && Object.keys(extras).length ? extras : null;
+    return names;
 }
 
 
