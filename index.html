@@ -83,6 +83,7 @@
         tr.sub-row td { background: #fbfcfe; font-size: 12px; }
         tr.sub-row td.row-label { font-weight: 400; padding-left: 28px; color: #374151; }
 
+        th .expand-btn { font-weight: 400; }
         .expand-btn {
             border: 1px solid #c7d2df; background: #ffffff; color: #1f4e78; border-radius: 4px;
             font-size: 11px; padding: 1px 6px; margin-left: 8px; cursor: pointer;
@@ -243,7 +244,7 @@
    ========================================================= */
 
 /* Financial year: 1 April FY_START_YEAR to 31 March FY_START_YEAR + 1 */
-var WIDGET_VERSION = "v11 - Company total / Sales team / Outside sales team";
+var WIDGET_VERSION = "v12 - Month-wise Quarter x Plan";
 
 var FY_START_YEAR = 2026;
 var FY_FILTER = FY_START_YEAR + "-" + (FY_START_YEAR + 1);   // Deal Year (Year2) value
@@ -402,6 +403,30 @@ var QUARTER_INFO = {
     Q4: { range: "1 Jan - 31 Mar " + (FY_START_YEAR + 1) }
 };
 
+var MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/* Month keys ("2026-04") of each FY quarter */
+function monthsOfQuarter(q) {
+    var start = { Q1: 3, Q2: 6, Q3: 9, Q4: 12 }[q];
+    var keys = [];
+    for (var i = 0; i < 3; i++) {
+        var d = new Date(FY_START_YEAR, start + i, 1);
+        keys.push(d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2));
+    }
+    return keys;
+}
+
+function monthLabel(key) {
+    var p = String(key).split("-");
+    return MONTH_NAMES[Number(p[1]) - 1] + " " + p[0];
+}
+
+function monthRangeLabel(key) {
+    var p = String(key).split("-");
+    var last = new Date(Number(p[0]), Number(p[1]), 0).getDate();
+    return "1 - " + last + " " + MONTH_NAMES[Number(p[1]) - 1] + " " + p[0];
+}
+
 var ALL_QUARTERS = "All Quarters";
 var GIST_NOT_ASSIGNED = "(Not assigned)";
 var CARD_CATEGORIES = ["achieved", "payment_received", "payment_pending", "current_pipeline"];
@@ -437,6 +462,8 @@ var paymentAmountUnitInUse = "rupees";
 var callsCache = {};
 var aorLive = null;
 var aorGistExpanded = false;
+var ebMonthsExpanded = false;
+var ebLastArgs = null;
 
 populateQuarterFilter();
 
@@ -1529,6 +1556,18 @@ function stageDateQuarter(deal, quarters) {
 }
 
 
+/* FY month ("2026-04") from the date that matches the deal's stage */
+function stageDateMonth(deal) {
+    if (isRemovedStage(deal.Stage)) return null;
+    var api = isClosedWonStage(deal.Stage) ? fieldInfo.actualOrderDate.api
+        : isClosedLostStage(deal.Stage) ? fieldInfo.closingDate.api
+        : fieldInfo.expectedOrderDate.api;
+    var date = ddParseDate(deal[api]);
+    if (!isInFyWindow(date)) return null;
+    return date.getFullYear() + "-" + ("0" + (date.getMonth() + 1)).slice(-2);
+}
+
+
 function stageDateName(stage) {
     if (isClosedWonStage(stage)) return "Actual Order Date";
     if (isClosedLostStage(stage)) return "Closing Date";
@@ -1620,6 +1659,7 @@ function dealContext(deal, live, selectedQuarter, gistSelection, cardMode) {
         account: account,
         accName: account ? account.name : ddLookupName(deal.Account_Name, "(Unnamed Account)"),
         quarter: quarter,
+        month: inWindow ? stageDateMonth(deal) : null,
         inWindow: inWindow,
         dateQuarters: dateQuarters,
         selectedQuarter: allQuarters ? ALL_QUARTERS : selectedQuarter,
@@ -1772,6 +1812,8 @@ function computeDealMetrics(live, ownerSet, gistSelection, selectedQuarter) {
         plans: [],
         matrix: {},
         pipelineByQuarter: {},
+        monthMatrix: {},
+        pipelineByMonth: {},
         planTotals: {},
         groupTotals: {},
         groupStages: {},
@@ -1788,6 +1830,10 @@ function computeDealMetrics(live, ownerSet, gistSelection, selectedQuarter) {
     quarters.forEach(function(q) {
         m.matrix[q] = {};
         m.pipelineByQuarter[q] = { amount_lakh: 0, count: 0, accounts: {} };
+        monthsOfQuarter(q).forEach(function(mk) {
+            m.monthMatrix[mk] = {};
+            m.pipelineByMonth[mk] = { amount_lakh: 0, count: 0, accounts: {} };
+        });
     });
 
     live.deals.forEach(function(deal) {
@@ -1829,6 +1875,7 @@ function computeDealMetrics(live, ownerSet, gistSelection, selectedQuarter) {
         if (countsAsExpected(ctx)) {
             addAmount(m.matrix[ctx.quarter], ctx.plan, ctx.amount, ctx.accId);
             addAmount(m.planTotals, ctx.plan, ctx.amount, ctx.accId);
+            if (ctx.month && m.monthMatrix[ctx.month]) addAmount(m.monthMatrix[ctx.month], ctx.plan, ctx.amount, ctx.accId);
         }
 
         if (isPipelineDeal(ctx)) {
@@ -1836,6 +1883,11 @@ function computeDealMetrics(live, ownerSet, gistSelection, selectedQuarter) {
             m.pipelineByQuarter[ctx.quarter].count += 1;
             m.pipelineByQuarter[ctx.quarter].accounts[ctx.accId] = true;
             m.pipelineTableAccounts[ctx.accId] = true;
+            if (ctx.month && m.pipelineByMonth[ctx.month]) {
+                m.pipelineByMonth[ctx.month].amount_lakh += ctx.amount;
+                m.pipelineByMonth[ctx.month].count += 1;
+                m.pipelineByMonth[ctx.month].accounts[ctx.accId] = true;
+            }
         }
     });
 
@@ -2785,10 +2837,22 @@ function lakhCell(bucket, category, extraClass, showAccounts) {
 }
 
 
+function toggleMonthBreakdown(event) {
+    if (event) event.stopPropagation();
+    ebMonthsExpanded = !ebMonthsExpanded;
+    if (ebLastArgs) {
+        renderExpectedBusiness.apply(null, ebLastArgs);
+        attachDrilldownHandlers();
+    }
+}
+
+
 function renderExpectedBusiness(m, live, targets, missingOwners) {
 
     var wrap = document.getElementById("expectedBusinessWrap");
     if (!wrap) return;
+
+    ebLastArgs = [m, live, targets, missingOwners];
 
     var notes = dataSourceNotes(m, live, missingOwners);
 
@@ -2829,21 +2893,29 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
 
     html += '</div>';
 
-    html += '<div class="table-scroll"><table class="eb-table"><thead><tr><th style="text-align:left;">Quarter</th>';
+    html += '<div class="table-scroll"><table class="eb-table"><thead><tr><th style="text-align:left;">Quarter' +
+        '<button class="expand-btn" onclick="toggleMonthBreakdown(event)">' +
+        (ebMonthsExpanded ? "Hide months" : "Show months") + '</button></th>';
     m.plans.forEach(function(plan, i) {
         html += '<th><span class="plan-dot" style="background:' + planColor(plan, i) + ';"></span>' + escapeHtml(plan) + '</th>';
     });
     html += '<th>Pipeline (by account owner)</th><th class="mix-col">Plan Mix</th></tr></thead><tbody>';
 
-    m.quarters.forEach(function(quarter) {
-
-        var rowTotal = { amount_lakh: 0, count: 0 };
-        m.plans.forEach(function(plan) {
-            var cell = m.matrix[quarter][plan];
-            if (!cell) return;
-            rowTotal.amount_lakh += cell.amount_lakh;
-            rowTotal.count += cell.count;
+    function mixCell(row) {
+        var rowTotal = 0;
+        m.plans.forEach(function(plan) { if (row[plan]) rowTotal += row[plan].amount_lakh; });
+        var out = '<td class="mix-col"><div class="mix-bar">';
+        m.plans.forEach(function(plan, i) {
+            var cell = row[plan];
+            if (!cell || !rowTotal || cell.amount_lakh <= 0) return;
+            var pct = (cell.amount_lakh / rowTotal) * 100;
+            out += '<span style="width:' + pct.toFixed(1) + '%;background:' + planColor(plan, i) + ';" title="' +
+                escapeHtml(plan) + ': ' + cell.amount_lakh.toFixed(2) + ' L"></span>';
         });
+        return out + '</div></td>';
+    }
+
+    m.quarters.forEach(function(quarter) {
 
         html += '<tr><td class="row-label">' + quarter + ' (Target = ' + formatLakh(targets[quarter]) + ')' +
             '<span class="sub">' + QUARTER_INFO[quarter].range + '</span></td>';
@@ -2853,16 +2925,20 @@ function renderExpectedBusiness(m, live, targets, missingOwners) {
         });
 
         html += lakhCell(m.pipelineByQuarter[quarter], "quarter_pipeline:" + encodeURIComponent(quarter), null, true);
+        html += mixCell(m.matrix[quarter]) + '</tr>';
 
-        html += '<td class="mix-col"><div class="mix-bar">';
-        m.plans.forEach(function(plan, i) {
-            var cell = m.matrix[quarter][plan];
-            if (!cell || !rowTotal.amount_lakh || cell.amount_lakh <= 0) return;
-            var pct = (cell.amount_lakh / rowTotal.amount_lakh) * 100;
-            html += '<span style="width:' + pct.toFixed(1) + '%;background:' + planColor(plan, i) + ';" title="' +
-                escapeHtml(plan) + ': ' + cell.amount_lakh.toFixed(2) + ' L"></span>';
-        });
-        html += '</div></td></tr>';
+        // Month rows under the quarter (Show months)
+        if (ebMonthsExpanded) {
+            monthsOfQuarter(quarter).forEach(function(mk) {
+                html += '<tr class="sub-row"><td class="row-label">' + monthLabel(mk) +
+                    '<span class="sub">' + monthRangeLabel(mk) + '</span></td>';
+                m.plans.forEach(function(plan) {
+                    html += lakhCell(m.monthMatrix[mk][plan], "mp:" + encodeURIComponent(mk) + ":" + encodeURIComponent(plan));
+                });
+                html += lakhCell(m.pipelineByMonth[mk], "month_pipeline:" + encodeURIComponent(mk), null, true);
+                html += mixCell(m.monthMatrix[mk]) + '</tr>';
+            });
+        }
     });
 
     if (m.quarters.length > 1) {
@@ -3305,6 +3381,8 @@ function categoryLabel(category) {
     if (parts[0] === "bucket") return decodeURIComponent(parts[1]) + " - " + parts[2].replace(/_/g, " ");
     if (parts[0] === "qp") return decodeURIComponent(parts[1]) + " " + decodeURIComponent(parts[2]) + " Expected Business";
     if (parts[0] === "quarter_pipeline") return decodeURIComponent(parts[1]) + " Pipeline (by account owner)";
+    if (parts[0] === "mp") return monthLabel(decodeURIComponent(parts[1])) + " " + decodeURIComponent(parts[2]) + " Expected Business";
+    if (parts[0] === "month_pipeline") return monthLabel(decodeURIComponent(parts[1])) + " Pipeline (by account owner)";
     if (parts[0] === "stage") return decodeURIComponent(parts[1]);
     if (parts[0] === "team") {
         var row = parts[1] === "others" ? { team: "Others" } : (SALES_TEAM_TARGETS[Number(parts[1])] || { team: "Team" });
@@ -3708,7 +3786,7 @@ async function runDrilldown(scope, category) {
     }
 
     // ---- Deal-based ----
-    var dealKinds = ["qp", "quarter_pipeline", "stage", "won_accounts", "lost_accounts"];
+    var dealKinds = ["qp", "quarter_pipeline", "mp", "month_pipeline", "stage", "won_accounts", "lost_accounts"];
 
     if (CARD_CATEGORIES.indexOf(category) !== -1 || dealKinds.indexOf(kind) !== -1) {
 
@@ -3733,6 +3811,10 @@ async function runDrilldown(scope, category) {
                         ok = ctx.quarter === decodeURIComponent(parts[1]) && ctx.plan === decodeURIComponent(parts[2]) && countsAsExpected(ctx);
                     } else if (kind === "quarter_pipeline") {
                         ok = ctx.quarter === decodeURIComponent(parts[1]) && isPipelineDeal(ctx);
+                    } else if (kind === "mp") {
+                        ok = ctx.month === decodeURIComponent(parts[1]) && ctx.plan === decodeURIComponent(parts[2]) && countsAsExpected(ctx);
+                    } else if (kind === "month_pipeline") {
+                        ok = ctx.month === decodeURIComponent(parts[1]) && isPipelineDeal(ctx);
                     } else if (kind === "stage") {
                         ok = stageGroupOf(ctx.stage) === decodeURIComponent(parts[1]);
                     }
